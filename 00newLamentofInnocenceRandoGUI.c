@@ -8,11 +8,13 @@
 #include <time.h>
 #include <gdk/gdk.h>
 #include <json-c/json.h> // Requires json-c librar
+#include <pango/pango.h>
+#include <unistd.h>
 
 #define ROWS 6
 #define COLS 8
-#define TOTAL_CHECKBOXES 48
-#define TOTAL_USED_CHECKBOXES 42
+#define TOTAL_CHECKBOXES 44
+#define TOTAL_USED_CHECKBOXES 43
 
 #define PRESET_FILE "00preset.json"
 
@@ -21,10 +23,49 @@
 
 _Bool DEBUG = false;
 
+
 typedef struct {
+    GtkEntry *entries[3];   // Store GtkEntry pointers
     GtkWidget *checkboxes[TOTAL_CHECKBOXES];
-    GtkEntry *entries[3];
+	GtkWidget *random_seed_button;
+    GtkWidget *save_button;  // Fix: Add missing member
+    GtkWidget *submit_button; // Fix: Add missing member
 } CheckBoxData;
+
+void scale_text(GtkWidget *widget, int size) {
+    GtkStyleContext *context = gtk_widget_get_style_context(widget);
+    char css[64];
+    snprintf(css, sizeof(css), "* { font-size: %dpx; }", size);
+    
+    GtkCssProvider *provider = gtk_css_provider_new();
+    gtk_css_provider_load_from_data(provider, css, -1, NULL);
+    
+    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_USER);
+    
+    g_object_unref(provider);
+}
+
+void on_window_resize(GtkWidget *widget, GdkRectangle *allocation, gpointer data) {
+    CheckBoxData *cb_data = (CheckBoxData *)data;
+
+    int new_size = allocation->width / 50; // Adjust based on window width
+    if (new_size < 6) new_size = 6; // Prevent too small text
+    if (new_size > 18) new_size = 18; // Prevent too large text
+
+    // Scale entry fields
+    scale_text(GTK_WIDGET(cb_data->entries[0]), new_size);
+    scale_text(GTK_WIDGET(cb_data->entries[1]), new_size);
+    scale_text(GTK_WIDGET(cb_data->entries[2]), new_size);
+
+    // Scale buttons
+    scale_text(cb_data->save_button, new_size);
+    scale_text(cb_data->submit_button, new_size);
+
+    // Scale checkboxes
+    for (int i = 0; i < TOTAL_CHECKBOXES; i++) {
+        scale_text(cb_data->checkboxes[i], new_size);
+    }
+}
 
 // Function to handle dropped file paths
 static void on_drag_data_received(GtkWidget *widget, GdkDragContext *context,
@@ -154,6 +195,21 @@ void save_preset(GtkWidget *widget, CheckBoxData *cb_data) {
     gtk_widget_destroy(info_dialog);
 }
 
+void random_seed(GtkWidget *widget, CheckBoxData *cb_data) {
+     // Initialize random number generator with more entropy
+      // Combine time and process ID for more randomness
+    int random_number = rand() ^ (getpid() << 16);  // Generate a random number
+
+    // If your platform supports better random functions, you can use them here
+    // For example: random() or /dev/urandom could be better on some systems
+
+    // Convert the random number to a string
+    char seed_str[20];  // Assuming the number won't exceed 20 digits
+    snprintf(seed_str, sizeof(seed_str), "%d", random_number);  // Convert to string
+
+    // Set the seed entry field with the generated random seed
+    gtk_entry_set_text(cb_data->entries[1], seed_str);  // Assuming cb_data->entries[1] is the seed entry
+}
 
 void give_information_about_everything(GtkWidget *parent)
 {
@@ -165,60 +221,21 @@ void give_information_about_everything(GtkWidget *parent)
                                     GTK_MESSAGE_WARNING,
                                     GTK_BUTTONS_OK,
                                     "WARNING: This will overwrite the provided .iso file.\n"
-                                    "The .iso FilePath cannot have any spaces in it.");
-    gtk_dialog_run(GTK_DIALOG(dialog));
-    gtk_widget_destroy(dialog);
-
-    // Display log file information
-    dialog = gtk_message_dialog_new(GTK_WINDOW(parent),
-                                    GTK_DIALOG_MODAL,
-                                    GTK_MESSAGE_INFO,
-                                    GTK_BUTTONS_OK,
-                                    "A log file does not need to be provided.\n"
+                                    "The .iso FilePath cannot have any spaces in it. \n"
+									"A log file does not need to be provided.\n"
                                     "(It is HIGHLY RECOMMENDED to have one)\n"
-                                    "The log FilePath provided needs to be a .txt file AND the FilePath can't have spaces.");
-    gtk_dialog_run(GTK_DIALOG(dialog));
-    gtk_widget_destroy(dialog);
-
-    // Case sensitivity note
-    dialog = gtk_message_dialog_new(GTK_WINDOW(parent),
-                                    GTK_DIALOG_MODAL,
-                                    GTK_MESSAGE_INFO,
-                                    GTK_BUTTONS_OK,
-                                    "Everything is Case Sensitive.");
-    gtk_dialog_run(GTK_DIALOG(dialog));
-    gtk_widget_destroy(dialog);
-
-    // Prelude to the Dark Abyss note
-    dialog = gtk_message_dialog_new(GTK_WINDOW(parent),
-                                    GTK_DIALOG_MODAL,
-                                    GTK_MESSAGE_INFO,
-                                    GTK_BUTTONS_OK,
-                                    "NOTE: Many of the locked doors in the Prelude to the Dark Abyss have been unlocked.\n"
-                                    "(This is despite them still looking locked.)");
-    gtk_dialog_run(GTK_DIALOG(dialog));
-    gtk_widget_destroy(dialog);
-
-    // Pagoda of the Misty Moon cutscene requirement
-    dialog = gtk_message_dialog_new(GTK_WINDOW(parent),
-                                    GTK_DIALOG_MODAL,
-                                    GTK_MESSAGE_INFO,
-                                    GTK_BUTTONS_OK,
-                                    "NOTE: You must watch the Cutscene of the Seal on the Pagoda of the Misty Moon door breaking\n"
+                                    "The log FilePath provided needs to be a .txt file AND the FilePath can't have spaces.\n"
+									"Everything is Case Sensitive.\n"
+									"NOTE: Many of the locked doors in the Prelude to the Dark Abyss have been unlocked.\n"
+                                    "(This is despite them still looking locked.)\n"
+									"NOTE: You must watch the Cutscene of the Seal on the Pagoda of the Misty Moon door breaking\n"
                                     "to be able to get to the final bosses.\n"
-                                    "(That does NOT mean you need to get all the orbs to enter the Pagoda.)");
-    gtk_dialog_run(GTK_DIALOG(dialog));
+                                    "(That does NOT mean you need to get all the orbs to enter the Pagoda.)\n"
+									"WARNING: If you leave the Golem boss fight after placing the E tablet,\n"
+                                    "you will NOT be able to fight him again.");
+	gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
 
-    // Golem boss fight warning
-    dialog = gtk_message_dialog_new(GTK_WINDOW(parent),
-                                    GTK_DIALOG_MODAL,
-                                    GTK_MESSAGE_WARNING,
-                                    GTK_BUTTONS_OK,
-                                    "WARNING: If you leave the Golem boss fight after placing the E tablet,\n"
-                                    "you will NOT be able to fight him again.");
-    gtk_dialog_run(GTK_DIALOG(dialog));
-    gtk_widget_destroy(dialog);
 }
 
 static void on_show_more_toggled(GtkToggleButton *toggle_button, gpointer data) {
@@ -11437,64 +11454,91 @@ static void on_submit(GtkWidget *widget, gpointer data) {
 
     gtk_main_quit(); // Close the window after submission
 }
+int main(int argc, char *argv[]) {  
+	gtk_init(&argc, &argv);
+	srand(time(NULL));
 
+    // Load CSS style
+	GtkCssProvider *css_provider = gtk_css_provider_new();
+	GdkDisplay *display = gdk_display_get_default(); // Use the default display
+	GdkScreen *screen = gdk_screen_get_default();    // Get the default screen
 
-int main(int argc, char *argv[]) { 
-	
+	gtk_css_provider_load_from_path(css_provider, "00style.css", NULL);
+	gtk_style_context_add_provider_for_screen(screen,
+		GTK_STYLE_PROVIDER(css_provider),
+		GTK_STYLE_PROVIDER_PRIORITY_USER);
+
+    
+    // Create the main window  
+    GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);  
+    gtk_window_set_title(GTK_WINDOW(window), "Castlevania: Lament of Innocence Randomizer");  
+    gtk_container_set_border_width(GTK_CONTAINER(window), 10);  
+    gtk_widget_set_size_request(window, 1200, 600);  
+    gtk_window_set_resizable(GTK_WINDOW(window), TRUE);  
+
+    // Create a vertical box layout  
+    GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);  
+    gtk_container_add(GTK_CONTAINER(window), vbox);  
+
+    // Create labeled entry fields  
+    GtkWidget *label1 = gtk_label_new("Filepath to Castlevania: Lament of Innocence NTSC-U ISO");  
+    gtk_box_pack_start(GTK_BOX(vbox), label1, FALSE, FALSE, 0);  
+
+    GtkWidget *entry1 = gtk_entry_new();  
+    gtk_widget_set_size_request(entry1, -1, 25); // Set height to 25px
+    gtk_box_pack_start(GTK_BOX(vbox), entry1, FALSE, FALSE, 0);
     gtk_init(&argc, &argv);
 
-	//GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    GtkWidget *label2 = gtk_label_new("Seed (leave blank for random)");  
+    gtk_box_pack_start(GTK_BOX(vbox), label2, FALSE, FALSE, 0);  
 
-	    // Create the main window
-    GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    gtk_window_set_title(GTK_WINDOW(window), "Castlevania: Lament of Innocence Randomizer");
-    gtk_container_set_border_width(GTK_CONTAINER(window), 20);
-    gtk_widget_set_size_request(window, 400, 300);
+    GtkWidget *entry2 = gtk_entry_new();
+	gtk_widget_set_size_request(entry2, -1, 25);
+	gtk_box_pack_start(GTK_BOX(vbox), entry2, FALSE, FALSE, 0);
 
-	give_information_about_everything(window);
+    GtkWidget *label3 = gtk_label_new("Filepath for Spoiler Log (.txt document)");  
+    gtk_box_pack_start(GTK_BOX(vbox), label3, FALSE, FALSE, 0);  
 
-    // Create a vertical box layout
-    GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
-    gtk_container_add(GTK_CONTAINER(window), vbox);
-
-	// Create labeled entry fields
-	GtkWidget *label1 = gtk_label_new("Filepath to Castlevania: Lament of Innocence NTSC-U ISO");
-	gtk_box_pack_start(GTK_BOX(vbox), label1, FALSE, FALSE, 0);
-	GtkWidget *entry1 = gtk_entry_new();
-	gtk_entry_set_text(GTK_ENTRY(entry1), "./CvLoI.iso"); // Set default ISO path
-	enable_drag_drop(entry1); // Enable drag-and-drop
-	gtk_box_pack_start(GTK_BOX(vbox), entry1, TRUE, TRUE, 0);
-
-	GtkWidget *label2 = gtk_label_new("Seed (leave blank for random)");
-	gtk_box_pack_start(GTK_BOX(vbox), label2, FALSE, FALSE, 0);
-	GtkWidget *entry2 = gtk_entry_new();
-	gtk_box_pack_start(GTK_BOX(vbox), entry2, TRUE, TRUE, 0);
-
-	GtkWidget *label3 = gtk_label_new("Filepath for Spoiler Log (.txt document)");
-	gtk_box_pack_start(GTK_BOX(vbox), label3, FALSE, FALSE, 0);
 	GtkWidget *entry3 = gtk_entry_new();
-	gtk_entry_set_text(GTK_ENTRY(entry3), "./Spllog.txt"); // Set default Spoiler Log path
-	enable_drag_drop(entry3); // Enable drag-and-drop
-	gtk_box_pack_start(GTK_BOX(vbox), entry3, TRUE, TRUE, 0);
+	gtk_widget_set_size_request(entry3, -1, 25);
+	gtk_box_pack_start(GTK_BOX(vbox), entry3, FALSE, FALSE, 0); 
 
-    // Create a grid for checkboxes
-    GtkWidget *grid = gtk_grid_new();
-    gtk_box_pack_start(GTK_BOX(vbox), grid, TRUE, TRUE, 0);
+   // Create a scrolled window for the checkboxes  
+    GtkWidget *scrolled_window = gtk_scrolled_window_new(NULL, NULL);  
+    gtk_box_pack_start(GTK_BOX(vbox), scrolled_window, TRUE, TRUE, 0);  
 
-	const gchar *unique_labels[TOTAL_CHECKBOXES] = {
-		"boss loadzones random", "enemy HP random", "enemy tolerance/weakness random", "default items shuffle", "relic MP drain to be random",
-		"key doors potentially not require their default key", "doppelganger loadzones random", "sub-weapon attacks random", "start with a random sub-weapon", "warp room random",
-		"Armor DEF random", "random Switch rooms", "random sub-weapon heart costs", "decrease starting DEF", "randomize some Important models and sprites",
-		"hints", "modify the power_ups", "QoL Wolf Foot", "QoL Shop modified", "QoL foods to heal HP, MP, and Hearts randomly",
-		"QoL start with Gold, MP, and Hearts", "QoL make key items not be on drops", "QoL item limits","", "Extension", "Draw Up",
-		"Vertical High", "Rising Shot", "Fast Rising", "Spinning Blast", "Energy Blast",
-		"Sonic Edge", "A Extension 1", "A Extension 2", "Step Attack", "Falcon Claw",
-		"Quick Step", "Quick Step 2", "Perfect Guard", "check_seed", "fake/trap items", "pumpkin subweapons", "randomize Save Rooms", "" ,"", "", "", "",
+    // Create a grid for checkboxes  
+    GtkWidget *grid = gtk_grid_new();  
+    gtk_container_add(GTK_CONTAINER(scrolled_window), grid);  
+
+    // Initialize CheckBoxData structure  
+    CheckBoxData cb_data;  
+
+    const gchar *unique_labels[TOTAL_CHECKBOXES] = {
+        "boss loadzones random", "enemy HP random", "enemy tolerance/\nweakness random", "default items shuffle", "relic MP drain\n to be random",
+        "key doors potentially not\n require their default key", "doppelganger loadzones random", "sub-weapon\n attacks random", "start with a\n random sub-weapon", "warp room random",
+        "Armor DEF random", "random Switch rooms", "random sub-weapon\n heart costs", "decrease starting DEF", "randomize some Important\n models and sprites",
+        "hints", "modify the power_ups", "QoL Wolf Foot", "QoL Shop modified", "QoL foods to heal HP, MP,\n and Hearts randomly",
+        "QoL start with Gold,\n MP, and Hearts", "QoL make key items\n not be on drops", "QoL item limits", "Start with Skills", "Extension", "Draw Up",
+        "Vertical High", "Rising Shot", "Fast Rising", "Spinning Blast", "Energy Blast",
+        "Sonic Edge", "A Extension 1", "A Extension 2", "Step Attack", "Falcon Claw",
+        "Quick Step", "Quick Step 2", "Perfect Guard", "check_seed", "fake/trap items", "pumpkin subweapons", "randomize Save Rooms", "",    };
+	
+	const gchar *checkbox_tooltips[TOTAL_CHECKBOXES] = {
+		"Randomize What boss door goes to which boss", "Randomize enemy HP", "Randomize enemy tolerance and weakness", "", "Randomize relic MP drain between the vanilla values",
+		"Key doors could require any of the 5 keys (all 5 still used)", "Randomize doppelganger loadzones (2/3 chance of changing)", "Randomize sub-weapon attacks", "Start with a random sub-weapon", "Randomize warp room",
+		"Randomize Armor DEF", "Randomize Switch rooms", "Randomize sub-weapon heart costs", "Decrease starting DEF", "Randomize some important models and sprites",
+		"Enable hints", "Modify the power-ups", "Put Wolf's Foot in shop for $-1,\nAlso has Wolf's Foot MP Drain VERY slowly", "Modify Shop items", "Make foods randomly heal HP, MP, and Hearts",
+		"Start with Gold, MP, and Hearts", "Make key items not be on drops", "Change item limits upto 255","Enable starting skills", "Enable Extension", "Enable Draw Up",
+		"Enable Vertical High", "Enable Rising Shot", "Enable Fast Rising", "Enable Spinning Blast", "Enable Energy Blast",
+		"Enable Sonic Edge", "Enable A Extension 1", "Enable A Extension 2", "Enable Step Attack", "Enable Falcon Claw",
+		"Enable Quick Step", "Enable Quick Step 2", "Enable Perfect Guard", "Check seed for completability",
+		"Enable fake/trap items\n Items named 'Sylph's Feather won't do\n what the model would imply", "pumpkin subweapons instead of normal for some", "Randomize Save Rooms", "", 
 	};
-
-	CheckBoxData cb_data;
-	for (int i = 0; i < TOTAL_CHECKBOXES; i++) {
-		cb_data.checkboxes[i] = gtk_check_button_new_with_label(unique_labels[i]);
+	
+	// Create checkboxes and apply the 'checkbox-label' class from CSS
+	for (int i = 0; i < TOTAL_CHECKBOXES; i++) {  
+		cb_data.checkboxes[i] = gtk_check_button_new_with_label(unique_labels[i]);  
 		
 		if (i >= 24 && i < 40) {
 			gtk_widget_hide(cb_data.checkboxes[i]); // Hide options 25 to 40 initially
@@ -11511,40 +11555,71 @@ int main(int argc, char *argv[]) {
             gtk_widget_set_sensitive(cb_data.checkboxes[i], FALSE); // Disable this checkbox
         }
 		
-		gtk_grid_attach(GTK_GRID(grid), cb_data.checkboxes[i], i % COLS, i / COLS, 1, 1); // Attach checkbox to grid
+		//gtk_grid_attach(GTK_GRID(grid), cb_data.checkboxes[i], i % COLS, i / COLS, 1, 1); // Attach checkbox to grid
+		
+		gtk_widget_set_tooltip_text(cb_data.checkboxes[i], checkbox_tooltips[i]);
+		
+		// Apply the CSS class to the checkbox label
+		GtkWidget *checkbox_label = gtk_bin_get_child(GTK_BIN(cb_data.checkboxes[i]));
+		gtk_style_context_add_class(gtk_widget_get_style_context(checkbox_label), "checkbox-label");
+
+		gtk_grid_attach(GTK_GRID(grid), cb_data.checkboxes[i], i % COLS, i / COLS, 1, 1);  
 	}
+	
 
     // Set the "Show More Options" checkbox at position (4, 0) and set it to show options 25-40
-    gtk_button_set_label(GTK_BUTTON(cb_data.checkboxes[23]), "start with skills");
+    //gtk_button_set_label(GTK_BUTTON(cb_data.checkboxes[23]), "start with skills");
     g_signal_connect(cb_data.checkboxes[23], "toggled", G_CALLBACK(on_show_more_toggled), &cb_data);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(cb_data.checkboxes[23]), TRUE); // Start checked
 
-    // Add entries to the CheckBoxData structure
-    cb_data.entries[0] = GTK_ENTRY(entry1);
-    cb_data.entries[1] = GTK_ENTRY(entry2);
-    cb_data.entries[2] = GTK_ENTRY(entry3);
+	//TODO: Random Seed Button  
+	//GtkWidget *random_seed_button = gtk_button_new_with_label("Generate Random Seed");
+    //gtk_box_pack_start(GTK_BOX(vbox), random_seed_button, FALSE, FALSE, 5);
+    //g_signal_connect(random_seed_button, "clicked", G_CALLBACK(random_seed), &cb_data);
+	cb_data.random_seed_button = gtk_button_new_with_label("Random seed");  
+    gtk_box_pack_start(GTK_BOX(vbox), cb_data.random_seed_button, FALSE, FALSE, 5);  
+	g_signal_connect(cb_data.random_seed_button, "clicked", G_CALLBACK(random_seed), &cb_data);
+	
+    // Save Preset Button  
+    cb_data.save_button = gtk_button_new_with_label("Save Preset");  
+    gtk_box_pack_start(GTK_BOX(vbox), cb_data.save_button, FALSE, FALSE, 5);  
 
+    // Submit Button  
+    cb_data.submit_button = gtk_button_new_with_label("Submit");  
+    gtk_box_pack_start(GTK_BOX(vbox), cb_data.submit_button, FALSE, FALSE, 10);  
+
+
+	// Scale buttons at startup
+	scale_text(cb_data.save_button, 14);
+	scale_text(cb_data.submit_button, 14); 
+
+    // Store entry widgets in CheckBoxData  
+    cb_data.entries[0] = GTK_ENTRY(entry1);  
+    cb_data.entries[1] = GTK_ENTRY(entry2);  
+    cb_data.entries[2] = GTK_ENTRY(entry3);  
+
+    // Set initial font size  
+    scale_text(label1, 14);  
+    scale_text(label2, 14);  
+    scale_text(label3, 14);  
+    scale_text(cb_data.save_button, 14);  
+    scale_text(cb_data.submit_button, 14);  
+	scale_text(cb_data.random_seed_button, 14);
+	
+	give_information_about_everything(window);
 	load_preset(&cb_data);
 	
-    // Save Preset Button
-	GtkWidget *save_preset_button = gtk_button_new_with_label("Save Preset");
-    gtk_box_pack_start(GTK_BOX(vbox), save_preset_button, FALSE, FALSE, 5);
-    g_signal_connect(save_preset_button, "clicked", G_CALLBACK(save_preset), &cb_data);
-	
+    // Connect resize event  
+    g_signal_connect(window, "size-allocate", G_CALLBACK(on_window_resize), &cb_data);  
 
-    // Create submit button
-    GtkWidget *submit_button = gtk_button_new_with_label("Submit");
-    gtk_box_pack_start(GTK_BOX(vbox), submit_button, FALSE, FALSE, 10);
-    g_signal_connect(submit_button, "clicked", G_CALLBACK(on_submit), &cb_data);
+    // Close window event  
+    g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);  
 
-    // Close window event
-    g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
+    // Show all widgets  
+    gtk_widget_show_all(window);  
 
-    // Show all widgets
-    gtk_widget_show_all(window);
+    // Run GTK main loop  
+    gtk_main();  
 
-    // Run the GTK main loop
-    gtk_main();
-
-    return 0;
-}
+    return 0;  
+}  
