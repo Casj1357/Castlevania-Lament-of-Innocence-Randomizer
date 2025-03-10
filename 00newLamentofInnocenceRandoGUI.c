@@ -34,14 +34,18 @@ typedef struct {
 
 void scale_text(GtkWidget *widget, int size) {
     GtkStyleContext *context = gtk_widget_get_style_context(widget);
-    char css[64];
-    snprintf(css, sizeof(css), "* { font-size: %dpx; }", size);
-    
+    char css[128];
+
+    // Apply font-size only to labels inside check buttons and other widgets
+    snprintf(css, sizeof(css),
+        "GtkButton, GtkEntry, GtkLabel, GtkCheckButton label { font-size: %dpx; }", 
+        size
+    );
+
     GtkCssProvider *provider = gtk_css_provider_new();
     gtk_css_provider_load_from_data(provider, css, -1, NULL);
-    
     gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_USER);
-    
+
     g_object_unref(provider);
 }
 
@@ -62,9 +66,12 @@ void on_window_resize(GtkWidget *widget, GdkRectangle *allocation, gpointer data
     scale_text(cb_data->submit_button, new_size);
 
     // Scale checkboxes
-    for (int i = 0; i < TOTAL_CHECKBOXES; i++) {
-        scale_text(cb_data->checkboxes[i], new_size);
-    }
+	for (int i = 0; i < TOTAL_CHECKBOXES; i++) {
+		GtkWidget *label = gtk_bin_get_child(GTK_BIN(cb_data->checkboxes[i])); // Get label inside checkbox
+		if (label) {
+			scale_text(label, new_size); // Apply scaling to the label inside the checkbox
+		}
+	}
 }
 
 // Function to handle dropped file paths
@@ -11117,6 +11124,7 @@ int helper_QoL_item_limit_call(GtkWidget *widget, gpointer data, FILE* fp,  GtkW
 	return user_input;
 }
 static void on_submit(GtkWidget *widget, gpointer data) {
+	//g_print("Submitted \n");
     unsigned int xseed = 0;
 	char player_chooses[] = {'N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N'};
     CheckBoxData *cb_data = (CheckBoxData *)data;
@@ -11128,9 +11136,17 @@ static void on_submit(GtkWidget *widget, gpointer data) {
 
     // Open first file
     FILE* fp = fopen(fp_FilePath, "rb+");
-    if (fp == NULL) {
-        printf("The file '%s' could not be opened. The program will now exit.\n", fp_FilePath);
-        return; // Avoid abrupt exit
+	if (fp == NULL) {
+		g_print("Error: Could not open file %s\n", fp_FilePath);
+
+		GtkWidget *dialog = gtk_message_dialog_new(
+			NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+			"The file '%s' could not be opened.", fp_FilePath
+		);
+		gtk_dialog_run(GTK_DIALOG(dialog));
+		gtk_widget_destroy(dialog);
+
+		return;
     } else {
         printf("The file '%s' opened successfully.\n", fp_FilePath);
     }
@@ -11473,7 +11489,7 @@ int main(int argc, char *argv[]) {
     GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);  
     gtk_window_set_title(GTK_WINDOW(window), "Castlevania: Lament of Innocence Randomizer");  
     gtk_container_set_border_width(GTK_CONTAINER(window), 10);  
-    gtk_widget_set_size_request(window, 1200, 600);  
+    gtk_widget_set_size_request(window, 1300, 600);  
     gtk_window_set_resizable(GTK_WINDOW(window), TRUE);  
 
     // Create a vertical box layout  
@@ -11487,7 +11503,7 @@ int main(int argc, char *argv[]) {
     GtkWidget *entry1 = gtk_entry_new();  
     gtk_widget_set_size_request(entry1, -1, 25); // Set height to 25px
     gtk_box_pack_start(GTK_BOX(vbox), entry1, FALSE, FALSE, 0);
-    gtk_init(&argc, &argv);
+	enable_drag_drop(entry1);
 
     GtkWidget *label2 = gtk_label_new("Seed (leave blank for random)");  
     gtk_box_pack_start(GTK_BOX(vbox), label2, FALSE, FALSE, 0);  
@@ -11502,6 +11518,7 @@ int main(int argc, char *argv[]) {
 	GtkWidget *entry3 = gtk_entry_new();
 	gtk_widget_set_size_request(entry3, -1, 25);
 	gtk_box_pack_start(GTK_BOX(vbox), entry3, FALSE, FALSE, 0); 
+	enable_drag_drop(entry3);
 
    // Create a scrolled window for the checkboxes  
     GtkWidget *scrolled_window = gtk_scrolled_window_new(NULL, NULL);  
@@ -11572,21 +11589,22 @@ int main(int argc, char *argv[]) {
     g_signal_connect(cb_data.checkboxes[23], "toggled", G_CALLBACK(on_show_more_toggled), &cb_data);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(cb_data.checkboxes[23]), TRUE); // Start checked
 
-	//TODO: Random Seed Button  
-	//GtkWidget *random_seed_button = gtk_button_new_with_label("Generate Random Seed");
-    //gtk_box_pack_start(GTK_BOX(vbox), random_seed_button, FALSE, FALSE, 5);
-    //g_signal_connect(random_seed_button, "clicked", G_CALLBACK(random_seed), &cb_data);
+
 	cb_data.random_seed_button = gtk_button_new_with_label("Random seed");  
     gtk_box_pack_start(GTK_BOX(vbox), cb_data.random_seed_button, FALSE, FALSE, 5);  
 	g_signal_connect(cb_data.random_seed_button, "clicked", G_CALLBACK(random_seed), &cb_data);
 	
     // Save Preset Button  
-    cb_data.save_button = gtk_button_new_with_label("Save Preset");  
-    gtk_box_pack_start(GTK_BOX(vbox), cb_data.save_button, FALSE, FALSE, 5);  
+	cb_data.save_button = gtk_button_new_with_label("Save Preset");  
+	gtk_box_pack_start(GTK_BOX(vbox), cb_data.save_button, FALSE, FALSE, 5);  
+	g_signal_connect(cb_data.save_button, "clicked", G_CALLBACK(save_preset), &cb_data);
 
-    // Submit Button  
-    cb_data.submit_button = gtk_button_new_with_label("Submit");  
-    gtk_box_pack_start(GTK_BOX(vbox), cb_data.submit_button, FALSE, FALSE, 10);  
+	// Submit Button  
+	cb_data.submit_button = gtk_button_new_with_label("Submit");  
+	gtk_box_pack_start(GTK_BOX(vbox), cb_data.submit_button, FALSE, FALSE, 10);  
+	//Still not working
+	g_signal_connect(cb_data.submit_button, "clicked", G_CALLBACK(on_submit), &cb_data);
+
 
 
 	// Scale buttons at startup
