@@ -13,8 +13,8 @@
 
 #define ROWS 6
 #define COLS 8
-#define TOTAL_CHECKBOXES 44
-#define TOTAL_USED_CHECKBOXES 43
+#define TOTAL_CHECKBOXES 45
+#define TOTAL_USED_CHECKBOXES 45
 
 #define PRESET_FILE "00preset.json"
 
@@ -282,9 +282,7 @@ int TODO(FILE* fp)
 	
 	Custom_item_list rando (REDO)
 	
-	Pumpkin Sub-weapons	
-	
-	Save Room Shuffle...
+	orbs/whips anywhere.
 	
 	more hints?
 	
@@ -4295,6 +4293,352 @@ void call_setup(FILE* fp)
 }
 
 //randomization
+void randomize_orbs_and_whips_to_anywhere(FILE* fp)
+{
+	unsigned char newByte = 0x00;
+	for(int i = 0x0044F590; i <= 0x44F5BF; i+=4)
+	{
+		fseek(fp,i,SEEK_SET);
+		fwrite(&newByte,sizeof(newByte),1,fp);
+	}		
+	int locations[] =
+	{
+		//non-Repeatable
+			0x20259A60, //Entrance
+			0x2044CAE0, //Entrance
+			0x2002CF80, //Entrance
+			0x09A6A980, //ASML
+			0x1745D4E0, //GFbT
+			0x05323DE0, //HoSR
+			0x23ED6C10, //Theatre
+			0x117ECB60, //DPoW
+			0x0A0C6B60, //ASML
+			//EntrancePotion = 
+			0x20259AE0,
+			// GFbTPotion = 
+			0x14AB1380,
+			// DPoWPotion = 
+			0x10BD2300,
+			// ASMLFlameElementalPotion = 
+			0x0B240470,
+			// ASMLMegingjordPotion = 
+			0x0C556070,
+			// HoSR1stPotion = 
+			0x0484E010,
+			// HoSR2ndPotion = 
+			0x049E4D80,
+			// Theatre1stPotion = 
+			0x23CE4480,
+			// Theatre2ndPotion = 
+			0x244AE000,
+			// HoSRHighPotion = 
+			0x02FC9690,
+			// PoETHighPotion = 
+			0x1F776C60,
+			// ASMLHangedManHighPotion = 
+			0x0B09D570,
+			// ASMLMegingjordHighPotion = 
+			0x0C555FF0,
+			// TheatreHighPotion = 
+			0x21EE6D10,
+			// DPoWSuperPotion = 
+			0x134CE560,
+			// ASMLSuperPotion = 
+			0x0C05D210,
+			// PotMMSuperPotion = 
+			0x1DE6CB60,
+			// DPoWHeartRepair = 
+			0x12B56990,
+			// TheatreHeartRepair = 
+			0x21D03C90,
+			0x250F8570, //Theatre
+			// EntranceSerum = 
+			0x2044CB60,
+			// HoSRSerum = 
+			0x02C297B0,
+			// EntranceUncursePotion = 
+			0x20804560,
+			// HoSRUncursePotion = 
+			0x02C29830,
+		//Magical Ticket
+			0x208045E0,
+		//Curtain Time Bell  
+			0x233A5CE0,
+			// HoSRNeapolitan = 
+			0x0319A080,
+			// ASMLShortcake = 
+			0x0BBD3080,
+			// HoSRRamen = 
+			0x08017400, //
+			// WhiteTigerKey = 
+			0x089FB1E0, //HoSR
+			// BlueDragonKey = 
+			0x124C2060, //DPoW
+			// RedPhoenixKey = 
+			0x18D2EA60, //GFbT
+			// BlackTurtleKey = 
+			0x24F26C60, //Theatre
+			// YellowDragonKey = 
+			0x0A77A3E0, //ASML
+			// AncientText2 = 
+			0x2245EEE0, //Theatre
+			// AncientText1 = 
+			0x0BEFB3F0,
+			// AncientText3 = 
+			0x0C1BC8F0,
+			// AncientText4 = 
+			0x09D38F00,
+			// Map1 = 
+			0x2002D000, //Entrance
+			// Map2 = 
+			0x0D05C770, //ASML
+			// Map3 = 
+			0x0ECFB510, //DPoW
+			// Map4 = 
+			0x1599D480, //GFbT
+			// Map5 = 
+			0x238EC470, //Theatre
+		//Event Items
+			// ToolBag = 
+			0x14467A60,
+			// ETablet = 
+			0x0B9E9C60,
+			// VITablet = 
+			0x1EDC0BE0,
+			// DragonCrest = 
+			0x1EF44160,
+			// UnlockJewel = 
+			0x1EAE6B60,
+			// Svarog Statue = 
+			0x209E5880,
+			// WolfsFoot = 
+			0x0AB0E960,
+			// SaiseiIncense = 
+			0x198E0B60,
+			// BlackBishop = 
+			0x08CFE360,
+			// LucifersSword = 
+			0x231FF460,
+			// LittleHammer = 
+			0x1233E0E0,
+			// MeditativeIncence = 
+			0x13337450, //
+			// Draupnir = 
+			0x13A638E0,
+			// AromaEarring = 
+			0x22B66E80,
+			// RacoonCharm = 
+			0x11C532E0,
+			// BloodyCape = 
+			0x08EA35E0,
+			// RingofFire = 
+			0x1491E9E0,
+			// ArticRing = 
+			0x0C34EAE0,
+			// RingofThunder = 
+			0x18A1DF60,
+			// HeartBrooch = 
+			0x22EB31E0,
+			// JewelCrush = 
+			0x172BE1E0,
+			// Megingjord = 
+			0x0C6C00E0,
+			// Brisingamen = 
+			0x23539760,
+		//Heart Max Up
+			// ASMLHPHeartUp = 
+			0x0B240370,
+			// ASMLFlameElementalHeartUp = 
+			0x0B2403F0,
+			// DPoWHeartUp1 = 
+			0x11C53360, //1st?
+			// DPoWHeartUp2 = 
+			0x12197CE0, //2nd?
+			// GFbTHeartUp = 
+			0x19092400,
+			// PotMMHeartUp = 
+			0x1E1DDA60,
+			// TheatreHeartUp = 
+			0x22D0CF60,
+		//MP Max Up
+			// HoSRMPMaxUp = 
+			0x088769E0,
+			// ASMLMPMaxUp = 
+			0x0BD97A80,
+			// DPoWMPMaxUp = 
+			0x12FD6ED0,
+			// TheatreMPMaxUp = 
+			0x22646A10,
+			// PotMMMPMaxUp = 
+			0x1E371160,
+		//HP Max Up
+			// HoSRHPMaxUp1 = 
+			0x02C29730,
+			// HoSRHPMaxUp2 = 
+			0x086CF560,
+			// ASMLHPMaxUp = 
+			0x0B3E7EE0,
+			// DPoWHPMaxUpBF1 = 
+			0x0F9B0880,
+			// HoSRHPMaxUpBF2 = 
+			0x12004460,
+			// TheatreHPMaxUp1 = 
+			0x2305A7E0,
+			// TheatreHPMaxUp2 = 
+			0x23761F00,
+			// GFbTHPMaxUp = 
+			0x156654E0,
+			//// PotMMDoppelHPMaxUp = 0x1C6B9510, //??? could cause problems
+			// PotMMHPMaxUp = 
+			0x1EC79C60, //
+		//$1000
+			// HoSR1000 = 
+			0x026F22D0, //replace with whip of lightning?
+			// ASML1000 = 
+			0x0AC7A7E0, //replace with whip of flames?
+			// DPoW1000 = 
+			0x134CE5E0, //replace with whip of ice?
+		//$400
+			// GFbT4001 = 
+			0x15665560, //replace with red orb?
+			// GFbT4002 = 
+			0x16343290, //replace with blue orb?
+			// GFbT4003 = 
+			0x1653B400, //replace with yellow orb?
+			// GFbT4004 = 
+			0x17120200, //replace with green orb?
+			// HoSR400 = 
+			0x04B91A10, //replace with purple orb?   
+
+			// ASML4001 = 
+			0x09908580, //replace with white bishop?
+
+			// ASML4002 = 
+			0x0ADDC6F0, //replace with Sacrificial doll?
+			// DPoW4001 = 
+			0x12B56890, //replace with Jade Mask?
+
+			// DPoW4002 = 
+			0x12B56910, //replace with Diamond?
+			
+			// Theatre4001 = 
+			0x23ED6C90, //replace with earth plate?
+			// Theatre4002 = 
+			0x240C9D80, //replace with meteor plate?
+			// Theatre4003 = 
+			0x242B7880, //replace with moonlight plate?
+			// Theatre4004 = 
+			0x24A24E80, //replace with solar plate?
+		//repeatable
+		//Torches
+		//Knives
+			// HoSRKnife = 
+			0x0708D580,
+			// ASMLKnife = 
+			0x0DA607F0,
+			// GFbTKnife = 
+			0x15FBCB00,
+			// PotMMKnife = 
+			0x1A6882F0,
+			// TheatreKnife = 
+			0x26237B70,
+		//Axes
+			// HoSRAxe = 
+			0x0335EA80,
+			// ASMLAxe = 
+			0x0CED53F0,
+			// DPoWFrostElementalAxe = 
+			0x10171D80,
+			// DPoWBridgeLeverAxe = 
+			0x11034C70,
+			// GFbTAxe = 
+			0x15827A70,
+			// PotMMAxe = 
+			0x1A688370,
+			// TheatreAxe = 
+			0x242B5610,
+		//Holy Water
+			// HoSRHolyWater = 
+			0x063C3EF0,
+			// GFbTHolyWater =
+			0x17778C00,
+			// PotMMHolyWater = 
+			0x1A6883F0,
+			// TheatreHolyWater = 
+			0x240C7A90,
+		//Crystal
+			// HoSRCrystal = 
+			0x02DF7310,
+			// ASMLCrystal = 
+			0x0D05AA70,
+			// DPoWCrystal = 
+			0x114C3AF0,
+			// GFbTCrystal = 
+			0x17EC3EF0,
+			// PotMMCrystal = 
+			0x1A688470,
+			// TheatreCrystal = 
+			0x265E8270,
+		//Cross
+			// HoSRCross = 
+			0x06703A00,
+			// ASMLWhiteOrbCross = 
+			0x0D1A24F0,
+			// ASML3FCross = 
+			0x0DE96970,
+			// DPoWCross = 
+			0x11636670,
+			// PotMMCross = 
+			0x1A6884F0,
+		//$250
+			0x14E46170, //replace with black orb?
+	};
+	int locationLEN = *(&locations + 1) - locations;
+	
+	int randVal;
+	int SIZE = 1;
+	unsigned char buffer[SIZE];
+	unsigned char new_byte;
+	for(int i = 0x7F; i <= 0x85; i++)
+	{
+		if(i == 0x84)
+			i++;
+		do
+		{
+			randVal = rand() % locationLEN;
+			fseek(fp,locations[randVal],SEEK_SET);
+			fread(buffer,sizeof(buffer),1,fp);
+			//printf("item: 0x%2X \n",buffer[0]);
+		}while(!(
+			(buffer[0] == 0x00) || 
+			(buffer[0] >= 0x2A && buffer[0] <= 0x2F) || 
+			(buffer[0] >= 0x43 && buffer[0] <= 0x4C) || 
+			(buffer[0] >= 0x93 && buffer[0] <= 0xA9)));
+		
+		fseek(fp,locations[randVal],SEEK_SET);
+		new_byte = (unsigned char)i;
+		fwrite(&new_byte,sizeof(new_byte),1,fp);
+	}
+	for(int i = 0x02; i <= 0x04; i++)
+	{
+		do
+		{
+			randVal = rand() % locationLEN;
+			fseek(fp,locations[randVal],SEEK_SET);
+			fread(buffer,sizeof(buffer),1,fp);
+			//printf("item: 0x%2X \n",buffer[0]);
+		}while(!(
+			(buffer[0] == 0x00) || 
+			(buffer[0] >= 0x2A && buffer[0] <= 0x2F) || 
+			(buffer[0] >= 0x43 && buffer[0] <= 0x4C) || 
+			(buffer[0] >= 0x93 && buffer[0] <= 0xA9)));
+		
+		fseek(fp,locations[randVal],SEEK_SET);
+		new_byte = (unsigned char)i;
+		fwrite(&new_byte,sizeof(new_byte),1,fp);
+	}
+	
+}
 void randomize_boss_music(FILE* fp)
 {
 	int music_addresses[] = 
@@ -4322,9 +4666,38 @@ void randomize_boss_music(FILE* fp)
 		0x211B4E84, // 2 //
 	};
 	int music_address_Len = *(&music_addresses + 1) - music_addresses;
+	
+	int song_list[] = {
+		//0x80EA,
+		//0x7FEA,
+		//0x7FEA,
+		//0x70EA,
+		//0x89EA,
+		0x87EA,
+		0x83EA,
+		0x7FEA,
+		0x81EA,
+		0x86EA,
+		0x82EA,
+		0x84EA,
+		0x85EA,
+		
+		0x6DEA,
+		0x6DEA,
+	};
+	
 	for(int i = 0; i < music_address_Len; i++)
 	{
+		fseek(fp,music_addresses[i],SEEK_SET);
 		
+		do
+		{
+			randVal = rand() % music_address_Len;
+		}while(song_list[randVal] == 0x0000);
+		
+		fwrite(&song_list[randVal],sizeof(song_list[randVal]),1,fp);
+		
+		song_list[randVal] = 0x0000;
 	}
 }
 void randomize_enemy_HP(FILE* fp)
@@ -11126,7 +11499,7 @@ int helper_QoL_item_limit_call(GtkWidget *widget, gpointer data, FILE* fp,  GtkW
 static void on_submit(GtkWidget *widget, gpointer data) {
 	//g_print("Submitted \n");
     unsigned int xseed = 0;
-	char player_chooses[] = {'N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N'};
+	char player_chooses[] = {'N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N','N'};
     CheckBoxData *cb_data = (CheckBoxData *)data;
 
     // Get text from entry fields
@@ -11266,6 +11639,24 @@ static void on_submit(GtkWidget *widget, gpointer data) {
 				randomize_sub_weapon_model_and_sprites(fp);
 				player_chooses[13] = 'Y';
 			}
+		}
+	}
+	for(int i = 0; i < TOTAL_CHECKBOXES; i++){
+		if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(cb_data->checkboxes[i]))) {
+			const gchar *label = gtk_button_get_label(GTK_BUTTON(cb_data->checkboxes[i]));
+			if(i == 43){
+				randomize_orbs_and_whips_to_anywhere(fp);
+				player_chooses[19] = 'Y';
+			}
+			if(i == 44){
+				randomize_boss_music(fp);
+				player_chooses[20] = 'Y';
+			}
+		}
+	}
+	for(int i = 0; i < TOTAL_CHECKBOXES; i++){
+		if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(cb_data->checkboxes[i]))) {
+			
 			if (i == 15) {
 				hints_write(fp);
 				player_chooses[12] = 'Y';
@@ -11286,7 +11677,6 @@ static void on_submit(GtkWidget *widget, gpointer data) {
 			}
 		}
 	}
-	
 	if(fptr != NULL)
 	{
 		//printf("write log part 1 \n");
@@ -11321,6 +11711,8 @@ static void on_submit(GtkWidget *widget, gpointer data) {
 		fprintf(fptr,"fake/trap items: %c  \n",(char)player_chooses[16]);
 		fprintf(fptr,"pumpkin subweapons: %c  \n",(char)player_chooses[17]);
 		fprintf(fptr,"Random Save Rooms: %c  \n",(char)player_chooses[18]);
+		fprintf(fptr,"Orbs/Whips anywhere: %c \n",(char)player_chooses[19]);
+		fprintf(fptr,"music rando: %c \n",(char)player_chooses[20]);
 		//printf("end of log part 1 \n");
 	}
 	
@@ -11539,7 +11931,7 @@ int main(int argc, char *argv[]) {
         "QoL start with Gold,\n MP, and Hearts", "QoL make key items\n not be on drops", "QoL item limits", "Start with Skills", "Extension", "Draw Up",
         "Vertical High", "Rising Shot", "Fast Rising", "Spinning Blast", "Energy Blast",
         "Sonic Edge", "A Extension 1", "A Extension 2", "Step Attack", "Falcon Claw",
-        "Quick Step", "Quick Step 2", "Perfect Guard", "check_seed", "fake/trap items", "pumpkin subweapons", "randomize Save Rooms", "",    };
+        "Quick Step", "Quick Step 2", "Perfect Guard", "check_seed", "fake/trap items", "pumpkin subweapons", "randomize \nSave Rooms", "orbs/whips \nanywhere","music rando",    };
 	
 	const gchar *checkbox_tooltips[TOTAL_CHECKBOXES] = {
 		"Randomize What boss door goes to which boss", "Randomize enemy HP", "Randomize enemy tolerance and weakness", "", "Randomize relic MP drain between the vanilla values",
@@ -11550,7 +11942,7 @@ int main(int argc, char *argv[]) {
 		"Enable Vertical High", "Enable Rising Shot", "Enable Fast Rising", "Enable Spinning Blast", "Enable Energy Blast",
 		"Enable Sonic Edge", "Enable A Extension 1", "Enable A Extension 2", "Enable Step Attack", "Enable Falcon Claw",
 		"Enable Quick Step", "Enable Quick Step 2", "Enable Perfect Guard", "Check seed for completability",
-		"Enable fake/trap items\n Items named 'Sylph's Feather won't do\n what the model would imply", "pumpkin subweapons instead of normal for some", "Randomize Save Rooms", "", 
+		"Enable fake/trap items\n Items named 'Sylph's Feather won't do\n what the model would imply", "pumpkin subweapons instead of normal for some", "Randomize Save Rooms", "removes the orb/whip from the boss \nand places them anywhere", "randomizes some 'mostly' boss music", 
 	};
 	
 	// Create checkboxes and apply the 'checkbox-label' class from CSS
