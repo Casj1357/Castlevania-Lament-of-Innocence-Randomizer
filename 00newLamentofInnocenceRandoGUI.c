@@ -13,8 +13,8 @@
 
 #define ROWS 6
 #define COLS 8
-#define TOTAL_CHECKBOXES 45
-#define TOTAL_USED_CHECKBOXES 45
+#define TOTAL_CHECKBOXES 47
+#define TOTAL_USED_CHECKBOXES 47
 
 #define PRESET_FILE "00preset.json"
 
@@ -278,11 +278,15 @@ int TODO(FILE* fp)
 {
 /*TODO:
 	
-	boss music rando?
-	
 	Custom_item_list rando (REDO)
 	
-	orbs/whips anywhere.
+	QoL_no_repeat_locking_rooms
+	
+	More torches on AreaLocking.
+	
+	fix ordering of checkboxes
+	
+	flip left vs right paths per areas...
 	
 	more hints?
 	
@@ -4293,6 +4297,1613 @@ void call_setup(FILE* fp)
 }
 
 //randomization
+void randomize_area_locking(FILE* fp)
+{	
+	int BossEntranceAddress[] = {
+		0x82C30F0, //AND 0x82C3070 //UndeadParasite
+		0xB147570, //FlameElemental
+		0xD5410F0, //Golem
+		0x13551370, //Joachim
+		0x133F0270, //FrostElemental
+		0x19B5A1F0, //Medusa
+		0x1A05E870, //Thunder Elemental
+		0x237F94F0, //Succubus
+		0x82C3070,
+		//0x1F51DD70 //ForgottenOne
+	};
+	int BossDataLength = *(&BossEntranceAddress + 1) - BossEntranceAddress;
+	
+	int AreaFirstRoomDoors[] = {
+		0x0913B585, //ASML (East) -	00 00 00 00 00 24 00 01
+		0x0913B605, //ASML (West) - 00 01 00 00 00 2A 00 01
+		0x1450D485, //GFbT - 		00 00 00 00 00 0D 00 03
+		0x02906105, //HoSR - 		00 00 00 00 00 2D 00 00
+		0x0E28B585, //DPoW - 		00 00 00 00 00 11 00 02
+		0x21A68F05, //Theatre - 	00 00 00 00 00 21 00 08
+	};
+	
+	//Lock the doors
+	int n = 0; 
+	unsigned char newByte = 0x03;
+	fseek(fp, AreaFirstRoomDoors[n], SEEK_SET);
+	fwrite(&newByte,sizeof(newByte),1,fp);
+	fseek(fp, AreaFirstRoomDoors[n+1], SEEK_SET);
+	fwrite(&newByte,sizeof(newByte),1,fp);
+	fseek(fp, BossEntranceAddress[n+1]+0x15, SEEK_SET);
+	fwrite(&newByte,sizeof(newByte),1,fp);
+	fseek(fp, BossEntranceAddress[n+2]+0x15, SEEK_SET);
+	fwrite(&newByte,sizeof(newByte),1,fp);
+	newByte = 0x02;
+	fseek(fp, AreaFirstRoomDoors[n+2], SEEK_SET);
+	fwrite(&newByte,sizeof(newByte),1,fp);
+	fseek(fp, BossEntranceAddress[n+5]+0x15, SEEK_SET);
+	fwrite(&newByte,sizeof(newByte),1,fp);
+	fseek(fp, BossEntranceAddress[n+6]+0x15, SEEK_SET);
+	fwrite(&newByte,sizeof(newByte),1,fp);
+	newByte = 0x05;
+	fseek(fp, AreaFirstRoomDoors[n+3], SEEK_SET);
+	fwrite(&newByte,sizeof(newByte),1,fp);
+	fseek(fp, BossEntranceAddress[n+0]+0x15, SEEK_SET);
+	fwrite(&newByte,sizeof(newByte),1,fp);
+	fseek(fp, BossEntranceAddress[n+8]+0x15, SEEK_SET);
+	fwrite(&newByte,sizeof(newByte),1,fp);
+	newByte = 0x04;
+	fseek(fp, AreaFirstRoomDoors[n+4], SEEK_SET);
+	fwrite(&newByte,sizeof(newByte),1,fp);
+	fseek(fp, BossEntranceAddress[n+3]+0x15, SEEK_SET);
+	fwrite(&newByte,sizeof(newByte),1,fp);
+	fseek(fp, BossEntranceAddress[n+4]+0x15, SEEK_SET);
+	fwrite(&newByte,sizeof(newByte),1,fp);
+	newByte = 0x01;
+	fseek(fp, AreaFirstRoomDoors[n+5], SEEK_SET);
+	fwrite(&newByte,sizeof(newByte),1,fp);
+	fseek(fp, BossEntranceAddress[n+7]+0x15, SEEK_SET);
+	fwrite(&newByte,sizeof(newByte),1,fp);
+	
+	//Unlock 1 area:
+	
+	int randVal = rand() % 5;
+	newByte = 0x00;
+	switch(randVal)
+	{
+		case 0: //ASML
+			fseek(fp, AreaFirstRoomDoors[n], SEEK_SET);
+			fwrite(&newByte,sizeof(newByte),1,fp);
+			fseek(fp, AreaFirstRoomDoors[n+1], SEEK_SET);
+			//fwrite(&newByte,sizeof(newByte),1,fp);
+			//fseek(fp, BossEntranceAddress[n+1]+0x15, SEEK_SET);
+			//fwrite(&newByte,sizeof(newByte),1,fp);
+			//fseek(fp, BossEntranceAddress[n+2]+0x15, SEEK_SET);
+			//fwrite(&newByte,sizeof(newByte),1,fp);
+			break;
+		case 1: //GFbT
+			fseek(fp, AreaFirstRoomDoors[n+2], SEEK_SET);
+			fwrite(&newByte,sizeof(newByte),1,fp);
+			//fseek(fp, BossEntranceAddress[n+5]+0x15, SEEK_SET);
+			//fwrite(&newByte,sizeof(newByte),1,fp);
+			//fseek(fp, BossEntranceAddress[n+6]+0x15, SEEK_SET);
+			//fwrite(&newByte,sizeof(newByte),1,fp);
+			break;
+		case 2: //HoSR
+			fseek(fp, AreaFirstRoomDoors[n+3], SEEK_SET);
+			fwrite(&newByte,sizeof(newByte),1,fp);
+			//fseek(fp, BossEntranceAddress[n+0]+0x15, SEEK_SET);
+			//fwrite(&newByte,sizeof(newByte),1,fp);
+			//fseek(fp, BossEntranceAddress[n+8]+0x15, SEEK_SET);
+			//fwrite(&newByte,sizeof(newByte),1,fp);
+			break;
+		case 3: //DPoW
+			fseek(fp, AreaFirstRoomDoors[n+4], SEEK_SET);
+			fwrite(&newByte,sizeof(newByte),1,fp);
+			//fseek(fp, BossEntranceAddress[n+3]+0x15, SEEK_SET);
+			//fwrite(&newByte,sizeof(newByte),1,fp);
+			//fseek(fp, BossEntranceAddress[n+4]+0x15, SEEK_SET);
+			//fwrite(&newByte,sizeof(newByte),1,fp);
+			break;
+		case 4: //Theatre
+			fseek(fp, AreaFirstRoomDoors[n+5], SEEK_SET);
+			fwrite(&newByte,sizeof(newByte),1,fp);
+			//fseek(fp, BossEntranceAddress[n+7]+0x15, SEEK_SET);
+			//fwrite(&newByte,sizeof(newByte),1,fp);
+			break;
+		default:
+			break;
+	}
+		
+	//place keys:
+	
+	//TESTING:
+	 int DPoW_torches[] =  		
+	 {
+		 0x10171D00, //Black = 0x5C;
+	 };
+	 int GFbT_torches[] =		
+	 {
+		 0x158279F0, //Blue = 0x5A;
+	 };
+	 int ASML_torches[] =
+	 {
+		 0xD1A2470, //Red = 0x5B;
+	 };
+	 int HoSR_torches[] = 		
+	 {
+		 //0x6703980, //Yellow = 0x5D;
+		 0x2DF7290, 
+	 };
+	 int Theatre_torches[] =  	
+	 {
+		 0x26237AF0, //White = 0x59;
+	 };	
+	int keys[] = {
+		0x5B,0x5A,0x5D,0x5C,0x59
+	};		
+		
+	// Torch addresses aligned to same order
+	int torches[5] = {
+		ASML_torches[0], GFbT_torches[0], HoSR_torches[0], DPoW_torches[0], Theatre_torches[0]
+	};	
+	
+	torches[0] = ASML_torches[rand() % (sizeof(ASML_torches)/sizeof(ASML_torches[0]))];
+	torches[1] = GFbT_torches[rand() % (sizeof(GFbT_torches)/sizeof(GFbT_torches[0]))];
+	torches[2] = HoSR_torches[rand() % (sizeof(HoSR_torches)/sizeof(HoSR_torches[0]))];
+	torches[3] = DPoW_torches[rand() % (sizeof(DPoW_torches)/sizeof(DPoW_torches[0]))];
+	torches[4] = Theatre_torches[rand() % (sizeof(Theatre_torches)/sizeof(Theatre_torches[0]))];
+	
+	// 1. Create an array of indices 0–4
+	int order[5] = {0,1,2,3,4};
+
+	// 2. Shuffle (Fisher–Yates)
+	for (int i = 4; i > 0; i--)
+	{
+		int j = rand() % (i + 1);
+		int temp = order[i];
+		order[i] = order[j];
+		order[j] = temp;
+	}
+
+	// 3. Enforce the 5-cycle by shifting mapping by 1 (Code Generated by you that says it does what you seem to be saying is a problem?)
+	//    area order[i] gets key from order[(i+1) % 5]
+	for (int pos = 0; pos < 5; pos++)
+	{
+		int area_index = order[pos];
+		int next_index = order[(pos + 1) % 5];
+
+		unsigned char key_to_write = keys[next_index];
+
+		fseek(fp, torches[area_index], SEEK_SET);
+		fwrite(&key_to_write, 1, 1, fp);
+	}
+}
+
+int torches[] = {
+		0x0226B830,
+		0x0226B8B0,
+		0x0226B930,
+		0x0226B9B0,
+		0x0226BA30,
+		0x0226BAB0,
+		0x0282C990,
+		0x0282CA10,
+		0x0282CA90,
+		0x0282CB10,
+		0x0282CB90,
+		0x0282CC10,
+		0x02A3B030,
+		0x02A3B0B0,
+		0x02A3B130,
+		0x02A3B1B0,
+		0x02A3B230,
+		0x02A3B2B0,
+		0x02C27610,
+		0x02C27690,
+		0x02C27710,
+		0x02C27790,
+		0x02C27810,
+		0x02C27890,
+		0x02DF7190,
+		0x02DF7210,
+		0x02DF7290,
+		0x02DF7390,
+		0x02FC7700,
+		0x02FC7780,
+		0x02FC7800,
+		0x02FC7880,
+		0x02FC7900,
+		0x02FC7980,
+		0x02FC7A00,
+		
+		0x03197E80,
+		0x03197F00,
+		0x03197F80,
+		0x03198000,
+		0x03198080,
+		0x0335E880,
+		0x0335E900,
+		0x0335E980,
+		0x0335EA00,
+		0x03533A80,
+		0x03533B00,
+		0x03533B80,
+		0x03533C00,
+		0x03533C80,
+		0x038DE070,
+		0x03AD55F0,
+		0x03C765F0,
+		0x03C76670,
+		
+		0x0401BCF0,
+		0x0401BD70,
+		0x0401BDF0,
+		0x041D4B60,
+		0x041D4BE0,
+		0x043CDA70,
+		0x043CDAF0,
+		0x0484C4C0,
+		0x0484C540,
+		0x0484C5C0,
+		0x0484C640,
+		0x0484C6C0,
+		0x049E3530,
+		0x049E35B0,
+		0x049E3630,
+		0x049E3730,
+		0x04B901B0,
+		0x04B90230,
+		0x04B902B0,
+		0x04D06000,
+		0x04D06080,
+		0x04D06100,
+		0x04D06180,
+		0x04E9CF80,
+		0x04E9D000,
+		0x04E9D080,
+		0x04E9D100,
+		0x04E9D180,
+		0x04E9D200,
+		
+		0x0502B000,
+		0x0502B080,
+		0x0502B100,
+		0x0502B180,
+		0x0502B200,
+		0x0502B280,
+		0x05D23080,
+		0x05D23100,
+		0x05D23180,
+		0x05D23200,
+		0x05D23280,
+		0x05D23300,
+		0x05D23380,
+		0x05D23400,
+		0x05E7BF60,
+		0x05E7BFE0,
+		0x05E7C060,
+		0x05E7C0E0,
+		0x05E7C160,
+		0x05E7C1E0,
+		0x05E7C260,
+		0x05FD5800,
+		0x05FD5880,
+		0x05FD5900,
+		0x05FD5980,
+		0x05FD5A00,
+		0x05FD5A80,
+		0x05FD5B00,
+		
+		0x0612FA00,
+		0x0612FA80,
+		0x0612FB00,
+		0x0612FB80,
+		0x0612FC00,
+		0x0612FC80,
+		0x0612FD00,
+		0x063C3CF0,
+		0x063C3D70,
+		0x063C3DF0,
+		0x063C3E70,
+		0x063C3F70,
+		0x063C3FF0,
+		0x063C4070,
+		0x06564900,
+		0x06564980,
+		0x06564A00,
+		0x06564A80,
+		0x06564B00,
+		0x06564B80,
+		0x06564C00,
+		0x06703900,
+		0x06703980,
+		0x06703A80,
+		0x06703B00,
+		0x06703B80,
+		0x06703C00,
+		0x068FB2E0,
+		0x068FB360,
+		0x068FB3E0,
+		0x068FB460,
+		0x068FB4E0,
+		0x068FB560,
+		0x068FB5E0,
+		0x06A52A70,
+		0x06A52AF0,
+		0x06A52B70,
+		0x06A52BF0,
+		0x06A52C70,
+		0x06A52CF0,
+		0x06A52D70,
+		0x06A52DF0,
+		0x06B950F0,
+		0x06B95170,
+		0x06B951F0,
+		0x06B95270,
+		0x06B952F0,
+		0x06B95370,
+		0x06B953F0,
+		0x06B95470,
+		0x06D07E70,
+		0x06D07EF0,
+		0x06D07F70,
+		0x06D07FF0,
+		0x06D08070,
+		0x06D080F0,
+		0x06D08170,
+		0x06ED50F0,
+		0x06ED5170,
+		0x06ED51F0,
+		0x06ED5270,
+		0x06ED52F0,
+		0x06ED5370,
+		0x06ED53F0,
+		
+		0x0708D500,
+		0x0708D600,
+		0x0708D680,
+		0x0708D700,
+		0x0708D780,
+		0x0708D800,
+		0x07255700,
+		0x07255780,
+		0x07255800,
+		0x07255880,
+		0x07255900,
+		0x07255980,
+		0x07255A00,
+		0x074256F0,
+		0x07425770,
+		0x074257F0,
+		0x07425870,
+		0x074258F0,
+		0x07425970,
+		0x074259F0,
+		0x07563B70,
+		0x07563BF0,
+		0x07563C70,
+		0x07563CF0,
+		0x07563D70,
+		0x076AA480,
+		0x076AA500,
+		0x076AA580,
+		0x076AA600,
+		0x076AA680,
+		0x077F2B70,
+		0x077F2BF0,
+		0x077F2C70,
+		0x077F2CF0,
+		0x077F2D70,
+		0x07942A00,
+		0x07942A80,
+		0x07942B00,
+		0x07942B80,
+		0x07942C00,
+		0x07A9C300,
+		0x07A9C380,
+		0x07A9C400,
+		0x07A9C480,
+		0x07A9C500,
+		0x07BF2980,
+		0x07BF2A00,
+		0x07BF2A80,
+		0x07BF2B00,
+		0x07BF2B80,
+		0x07D49380,
+		0x07D49400,
+		0x07D49480,
+		0x07D49500,
+		0x07D49580,
+		0x07EAF580,
+		0x07EAF600,
+		0x07EAF680,
+		0x07EAF700,
+		0x07EAF780,
+		
+		0x08015E80,
+		0x08015F00,
+		0x08015F80,
+		0x08016000,
+		0x08016080,
+		0x081CC3E0,
+		0x081CC460,
+		0x081CC4E0,
+		0x081CC560,
+		0x081CC5E0,
+		0x081CC660,
+		0x083C2FF0,
+		0x083C3070,
+		0x083C30F0,
+		0x083C3170,
+		0x083C31F0,
+		0x083C3270,
+		0x083C32F0,
+		0x08529680,
+		0x08529700,
+		0x08529780,
+		0x08529800,
+		0x08529880,
+		0x08B56780,
+		0x08B56800,
+		0x08B56880,
+		0x08B56900,
+		
+		0x09348040,
+		0x0956D370,
+		0x0956D3F0,
+		0x0956D470,
+		0x0956D4F0,
+		0x0979B8F0,
+		0x0979B970,
+		0x0979B9F0,
+		0x0979BA70,
+		0x09906FC0,
+		0x09907040,
+		0x09A694C0,
+		0x09A69540,
+		0x09BD79C0,
+		0x09BD7A40,
+		0x09BD7AC0,
+		0x09BD7B40,
+		0x09D37AC0,
+		0x09D37B40,
+		0x09F5DFF0,
+		0x09F5E070,
+		0x09F5E0F0,
+		0x09F5E170,
+		
+		0x0A2FC700,
+		0x0A2FC780,
+		0x0A2FC800,
+		0x0A2FC880,
+		0x0A5F43C0,
+		0x0A5F4440,
+		0x0A5F44C0,
+		0x0A5F4540,
+		0x0ADDBC80,
+		0x0ADDBD00,
+		0x0AF3E670,
+		0x0AF3E6F0,
+		0x0AF3E770,
+		0x0AF3E7F0,
+		
+		0x0B09CC80,
+		0x0B09CD00,
+		0x0B23ECC0,
+		0x0B23ED40,
+		0x0B23EE40,
+		0x0B23EEC0,
+		0x0B701270,
+		0x0B7012F0,
+		0x0B701370,
+		0x0B7013F0,
+		0x0B87FFD0,
+		0x0B880050,
+		0x0BD96440,
+		0x0BD964C0,
+		0x0BEF9DC0,
+		0x0BEF9E40,
+		
+		0x0C05BCC0,
+		0x0C05BD40,
+		0x0C1BB440,
+		0x0C1BB4C0,
+		0x0C8E91F0,
+		0x0C8E9270,
+		0x0C8E92F0,
+		0x0C8E9370,
+		0x0CA5DCC0,
+		0x0CA5DD40,
+		0x0CA5DDC0,
+		0x0CA5DE40,
+		0x0CBFF1F0,
+		0x0CBFF270,
+		0x0CBFF2F0,
+		0x0CBFF370,
+		0x0CBFF3F0,
+		0x0CD8E870,
+		0x0CD8E8F0,
+		0x0CED5370,
+		0x0CED5470,
+		0x0CED54F0,
+		0x0CED5570,
+		0x0CED55F0,
+		
+		0x0D05A970,
+		0x0D05A9F0,
+		0x0D05AAF0,
+		0x0D1A2470,
+		0x0D1A2570,
+		0x0D1A25F0,
+		0x0D329DF0,
+		0x0D329E70,
+		0x0D329EF0,
+		0x0D329F70,
+		0x0D4CA7F0,
+		0x0D4CA870,
+		0x0D4CA8F0,
+		0x0D4CA970,
+		0x0D629AF0,
+		0x0D629B70,
+		0x0D629BF0,
+		0x0D629C70,
+		0x0D629CF0,
+		0x0D629D70,
+		0x0D781B70,
+		0x0D781BF0,
+		0x0D781C70,
+		0x0D781CF0,
+		0x0D781D70,
+		0x0D781DF0,
+		0x0D8DC3F0,
+		0x0D8DC470,
+		0x0D8DC4F0,
+		0x0D8DC570,
+		0x0D8DC5F0,
+		0x0D8DC670,
+		0x0DA60870,
+		0x0DBAD9F0,
+		0x0DBADA70,
+		0x0DBADAF0,
+		0x0DBADB70,
+		0x0DBADBF0,
+		0x0DBADC70,
+		0x0DD0B170,
+		0x0DD0B1F0,
+		0x0DD0B270,
+		0x0DD0B2F0,
+		0x0DD0B370,
+		0x0DD0B3F0,
+		0x0DE96870,
+		0x0DE968F0,
+		0x0DE969F0,
+		0x0DFF5670,
+		0x0DFF56F0,
+		0x0DFF5770,
+		0x0DFF57F0,
+		0x0DFF5870,
+		0x0DFF58F0,
+		
+		0x0E150670,
+		0x0E1506F0,
+		0x0E150770,
+		0x0E1507F0,
+		0x0E150870,
+		0x0E1508F0,
+		0x0E519EF0,
+		0x0E519F70,
+		0x0E519FF0,
+		0x0E51A070,
+		0x0E6AD3F0,
+		0x0E6AD470,
+		0x0E6AD4F0,
+		0x0E6AD570,
+		0x0E6AD5F0,
+		0x0E6AD670,
+		0x0E83AAF0,
+		0x0E83AB70,
+		0x0E83ABF0,
+		0x0E83AC70,
+		0x0E83ACF0,
+		0x0E83AD70,
+		0x0E9D3970,
+		0x0E9D39F0,
+		0x0E9D3A70,
+		0x0E9D3AF0,
+		0x0E9D3B70,
+		0x0EB64070,
+		0x0EB640F0,
+		0x0EB64170,
+		0x0EB641F0,
+		0x0EB64270,
+		0x0EB642F0,
+		0x0ECFA770,
+		0x0ECFA7F0,
+		0x0ECFA870,
+		0x0ECFA8F0,
+		0x0EEA14F0,
+		0x0EEA1570,
+		0x0EEA15F0,
+		0x0EEA1670,
+		
+		0x0F032170,
+		0x0F0321F0,
+		0x0F032270,
+		0x0F0322F0,
+		0x0F1C5370,
+		0x0F1C53F0,
+		0x0F1C5470,
+		0x0F1C54F0,
+		0x0F1C5570,
+		0x0F1C55F0,
+		0x0F354770,
+		0x0F3547F0,
+		0x0F354870,
+		0x0F3548F0,
+		0x0F354970,
+		0x0F4E5F70,
+		0x0F4E5FF0,
+		0x0F4E6070,
+		0x0F4E60F0,
+		0x0F4E6170,
+		0x0F678570,
+		0x0F6785F0,
+		0x0F678670,
+		0x0F6786F0,
+		0x0F678770,
+		0x0F6787F0,
+		0x0F80C0F0,
+		0x0F80C170,
+		0x0F80C1F0,
+		0x0F80C270,
+		0x0F80C2F0,
+		0x0F80C370,
+		0x0FB656F0,
+		0x0FB65770,
+		0x0FB657F0,
+		0x0FB65870,
+		0x0FB658F0,
+		0x0FD6BAF0,
+		0x0FD6BB70,
+		0x0FD6BBF0,
+		0x0FD6BC70,
+		0x0FD6BCF0,
+		0x0FD6BD70,
+		0x0FF705F0,
+		0x0FF70670,
+		0x0FF706F0,
+		0x0FF70770,
+		0x0FF707F0,
+		0x0FF70870,
+		
+		0x10171B80,
+		0x10171C00,
+		0x10171C80,
+		0x10171D00,
+		0x10171E00,
+		0x103697F0,
+		0x10369870,
+		0x103698F0,
+		0x10369970,
+		0x103699F0,
+		0x10369A70,
+		0x105803F0,
+		0x10580470,
+		0x105804F0,
+		0x10580570,
+		0x105805F0,
+		0x10580670,
+		0x105806F0,
+		0x10785DF0,
+		0x10785E70,
+		0x10785EF0,
+		0x10785F70,
+		0x10785FF0,
+		0x10786070,
+		0x109BD370,
+		0x109BD3F0,
+		0x109BD470,
+		0x109BD4F0,
+		0x109BD570,
+		0x109BD5F0,
+		0x109BD670,
+		0x109BD6F0,
+		0x10BD1570,
+		0x10BD15F0,
+		0x10BD1670,
+		0x10BD16F0,
+		0x10BD1770,
+		0x10BD17F0,
+		0x10D4A8F0,
+		0x10D4A970,
+		0x10D4A9F0,
+		0x10D4AA70,
+		0x10EC34F0,
+		0x10EC3570,
+		0x10EC35F0,
+		0x10EC3670,
+		
+		0x11034B70,
+		0x11034BF0,
+		0x11034CF0,
+		0x11034D70,
+		0x11034DF0,
+		0x111AB380,
+		0x111AB400,
+		0x111AB480,
+		0x111AB500,
+		0x111AB580,
+		0x111AB600,
+		0x11351780,
+		0x11351800,
+		0x11351880,
+		0x11351900,
+		0x114C3970,
+		0x114C39F0,
+		0x114C3A70,
+		0x114C3B70,
+		0x114C3BF0,
+		0x11636570,
+		0x116365F0,
+		0x116366F0,
+		0x11636770,
+		0x116367F0,
+		0x11C52710,
+		0x11C52790,
+		0x11C52810,
+		0x11C52890,
+		0x11D5B510,
+		0x11D5B590,
+		0x11E53990,
+		0x11E53A10,
+		
+		0x12B54A30,
+		0x12B54AB0,
+		0x12B54B30,
+		0x12B54BB0,
+		0x12B54C30,
+		0x12B54CB0,
+		0x12B54D30,
+		
+		0x1361C9F0,
+		0x1361CA70,
+		0x1361CAF0,
+		0x1361CB70,
+		0x138BA870,
+		0x138BA8F0,
+		0x138BA970,
+		0x138BA9F0,
+		0x13BAD2F0,
+		0x13BAD370,
+		0x13BAD3F0,
+		0x13BAD470,
+		0x13D90BF0,
+		0x13D90C70,
+		0x13D90CF0,
+		0x13D90D70,
+		0x13D90DF0,
+		0x13D90E70,
+		0x13D90EF0,
+		0x13D90F70,
+		
+		0x14135370,
+		0x141353F0,
+		0x14135470,
+		0x141354F0,
+		0x14135570,
+		0x141355F0,
+		0x14135670,
+		0x142C29F0,
+		0x142C2A70,
+		0x142C2AF0,
+		0x142C2B70,
+		0x142C2BF0,
+		0x142C2C70,
+		0x142C2CF0,
+		0x142C2D70,
+		0x145F1D10,
+		0x145F1D90,
+		0x145F1E10,
+		0x145F1E90,
+		0x1477E880,
+		0x1477E900,
+		0x1477E980,
+		0x1477EA00,
+		0x1477EA80,
+		0x1477EB00,
+		0x1477EB80,
+		0x1477EC00,
+		0x14AAFC80,
+		0x14AAFD00,
+		0x14AAFD80,
+		0x14AAFE00,
+		0x14C583F0,
+		0x14C58470,
+		0x14C584F0,
+		0x14C58570,
+		0x14C585F0,
+		0x14C58670,
+		0x14C586F0,
+		0x14E45F70,
+		0x14E45FF0,
+		0x14E46070,
+		0x14E460F0,
+		
+		0x15172C70,
+		0x15172CF0,
+		0x15172D70,
+		0x15172DF0,
+		0x15172E70,
+		0x15172EF0,
+		0x15172F70,
+		0x15172FF0,
+		0x1531AC70,
+		0x1531ACF0,
+		0x1531AD70,
+		0x1531ADF0,
+		0x1531AE70,
+		0x1531AEF0,
+		0x1531AF70,
+		0x15664A40,
+		0x15664B40,
+		0x15664BC0,
+		0x15664C40,
+		0x15664CC0,
+		0x15827870,
+		0x158278F0,
+		0x15827970,
+		0x158279F0,
+		0x15827AF0,
+		0x15827B70,
+		0x15827BF0,
+		0x1599C340,
+		0x1599C3C0,
+		0x1599C440,
+		0x1599C4C0,
+		0x1599C540,
+		0x1599C5C0,
+		0x15B0CB10,
+		0x15B0CB90,
+		0x15B0CC10,
+		0x15B0CC90,
+		0x15C7C6F0,
+		0x15C7C770,
+		0x15C7C7F0,
+		0x15C7C870,
+		0x15C7C8F0,
+		0x15C7C970,
+		0x15C7C9F0,
+		0x15C7CA70,
+		0x15E02090,
+		0x15E02110,
+		0x15E02190,
+		0x15E02210,
+		0x15FBCA00,
+		0x15FBCA80,
+		0x15FBCB80,
+		0x15FBCC00,
+		0x15FBCC80,
+		0x15FBCD00,
+		0x15FBCD80,
+		
+		0x1614B0F0,
+		0x1614B170,
+		0x1614B1F0,
+		0x1614B270,
+		0x1614B2F0,
+		0x1614B370,
+		0x1614B3F0,
+		0x1614B470,
+		0x16341BF0,
+		0x16341C70,
+		0x16341CF0,
+		0x16341D70,
+		0x16341DF0,
+		0x16341E70,
+		0x16341EF0,
+		0x16341F70,
+		0x16539EF0,
+		0x16539F70,
+		0x16539FF0,
+		0x1653A070,
+		0x1653A0F0,
+		0x1653A170,
+		0x1653A1F0,
+		0x1653A270,
+		0x166AEEB0,
+		0x166AEF30,
+		0x166AEFB0,
+		0x166AF030,
+		0x166AF0B0,
+		0x166AF130,
+		0x166AF1B0,
+		0x166AF230,
+		0x169783F0,
+		0x16978470,
+		0x169784F0,
+		0x16978570,
+		0x169785F0,
+		0x16978670,
+		0x16B704F0,
+		0x16B70570,
+		0x16B705F0,
+		0x16B70670,
+		0x16B706F0,
+		0x16B70770,
+		0x16B707F0,
+		0x16B70870,
+		0x16D35A00,
+		0x16D35A80,
+		0x16D35B00,
+		0x16D35B80,
+		0x16D35C00,
+		0x16D35C80,
+		0x16D35D00,
+		0x16D35D80,
+		0x16F2DE70,
+		0x16F2DEF0,
+		0x16F2DF70,
+		0x16F2DFF0,
+		0x16F2E070,
+		0x16F2E0F0,
+		0x16F2E170,
+		0x16F2E1F0,
+		
+		0x1711EFF0,
+		0x1711F070,
+		0x1711F0F0,
+		0x1711F170,
+		0x175BBEF0,
+		0x175BBF70,
+		0x175BBFF0,
+		0x175BC070,
+		0x175BC0F0,
+		0x17778A80,
+		0x17778B00,
+		0x17778B80,
+		0x17778C80,
+		0x17778D00,
+		0x17778D80,
+		0x17778E00,
+		0x17905770,
+		0x179057F0,
+		0x17905870,
+		0x179058F0,
+		0x17905970,
+		0x179059F0,
+		0x17905A70,
+		0x17905AF0,
+		0x17B57770,
+		0x17B577F0,
+		0x17B57870,
+		0x17B578F0,
+		0x17D39FF0,
+		0x17D3A070,
+		0x17D3A0F0,
+		0x17D3A170,
+		0x17D3A1F0,
+		0x17D3A270,
+		0x17D3A2F0,
+		0x17EC3DF0,
+		0x17EC3E70,
+		0x17EC3F70,
+		0x17EC3FF0,
+		0x17EC4070,
+		
+		0x180B7C70,
+		0x180B7CF0,
+		0x180B7D70,
+		0x180B7DF0,
+		0x180B7E70,
+		0x180B7EF0,
+		0x180B7F70,
+		0x180B7FF0,
+		0x182999F0,
+		0x18299A70,
+		0x18299AF0,
+		0x18299B70,
+		0x18299BF0,
+		0x18299C70,
+		0x18299CF0,
+		0x18299D70,
+		0x184804F0,
+		0x18480570,
+		0x184805F0,
+		0x18480670,
+		0x184806F0,
+		0x18480770,
+		0x184807F0,
+		0x18480870,
+		0x1882F500,
+		0x1882F580,
+		0x1882F600,
+		0x1882F680,
+		0x18A1DA70,
+		0x18A1DAF0,
+		0x18A1DB70,
+		0x18A1DBF0,
+		0x18BA8D70,
+		0x18BA8DF0,
+		0x18BA8E70,
+		0x18BA8EF0,
+		0x18BA8F70,
+		0x18BA8FF0,
+		
+		0x192A3170,
+		0x192A31F0,
+		0x192A3270,
+		0x192A32F0,
+		0x19440E70,
+		0x19440EF0,
+		0x19440F70,
+		0x19440FF0,
+		0x19441070,
+		0x194410F0,
+		0x19441170,
+		0x194411F0,
+		0x195AFA90,
+		0x195AFB10,
+		0x195AFB90,
+		0x195AFC10,
+		0x1973D5F0,
+		0x1973D670,
+		0x1973D6F0,
+		0x1973D770,
+		0x1973D7F0,
+		0x1973D870,
+		0x1973D8F0,
+		0x1973D970,
+		0x19C62B70,
+		0x19C62BF0,
+		0x19C62C70,
+		0x19C62CF0,
+		0x19C62D70,
+		0x19C62DF0,
+		0x19C62E70,
+		0x19C62EF0,
+		
+		0x1A15F1F0,
+		0x1A15F270,
+		0x1A15F2F0,
+		0x1A15F370,
+		0x1A15F3F0,
+		0x1A15F470,
+		0x1A15F4F0,
+		0x1A15F570,
+		0x1A829370,
+		0x1A8293F0,
+		0x1A829470,
+		0x1A8294F0,
+		0x1A829570,
+		0x1A9D70F0,
+		0x1A9D7170,
+		0x1A9D71F0,
+		0x1A9D7270,
+		0x1A9D72F0,
+		0x1AB63670,
+		0x1AB636F0,
+		0x1AB63770,
+		0x1AB637F0,
+		0x1AB63870,
+		0x1AB638F0,
+		0x1AB63970,
+		0x1AD24270,
+		0x1AD242F0,
+		0x1AD24370,
+		0x1AD243F0,
+		0x1AD24470,
+		0x1AEB3480,
+		0x1AEB3500,
+		0x1AEB3580,
+		0x1AEB3600,
+		
+		0x1B05E080,
+		0x1B05E100,
+		0x1B05E180,
+		0x1B05E200,
+		0x1B1ECC00,
+		0x1B1ECC80,
+		0x1B1ECD00,
+		0x1B1ECD80,
+		0x1B1ECE00,
+		0x1B38DEF0,
+		0x1B38DF70,
+		0x1B38DFF0,
+		0x1B38E070,
+		0x1B38E0F0,
+		0x1B38E170,
+		0x1B52E0F0,
+		0x1B52E170,
+		0x1B52E1F0,
+		0x1B52E270,
+		0x1B52E2F0,
+		0x1B52E370,
+		0x1B69C100,
+		0x1B69C180,
+		0x1B69C200,
+		0x1B69C280,
+		0x1B813F80,
+		0x1B814000,
+		0x1B9B1900,
+		0x1B9B1980,
+		0x1B9B1A00,
+		0x1BB3D980,
+		0x1BB3DA00,
+		0x1BCAAC80,
+		0x1BCAAD00,
+		0x1BCAAD80,
+		0x1BCAAE00,
+		0x1BE23080,
+		0x1BE23100,
+		0x1BFC0080,
+		0x1BFC0100,
+		0x1BFC0180,
+		
+		0x1C15A280,
+		0x1C15A300,
+		0x1C2D4A00,
+		0x1C2D4A80,
+		0x1C6B85F0,
+		0x1C6B8670,
+		0x1C6B86F0,
+		0x1C6B8770,
+		0x1C6B87F0,
+		0x1C6B8870,
+		0x1C6B88F0,
+		0x1C875070,
+		0x1C8750F0,
+		0x1C875170,
+		0x1C8751F0,
+		0x1C875270,
+		0x1C8752F0,
+		0x1C875370,
+		0x1C9FBE70,
+		0x1C9FBEF0,
+		0x1C9FBF70,
+		0x1C9FBFF0,
+		0x1C9FC070,
+		0x1C9FC0F0,
+		0x1CB99D70,
+		0x1CB99DF0,
+		0x1CB99E70,
+		0x1CB99EF0,
+		0x1CB99F70,
+		0x1CB99FF0,
+		0x1CB9A070,
+		0x1CD35B70,
+		0x1CD35BF0,
+		0x1CD35C70,
+		0x1CD35CF0,
+		0x1CD35D70,
+		0x1CD35DF0,
+		0x1CD35E70,
+		0x1CEEA7F0,
+		0x1CEEA870,
+		0x1CEEA8F0,
+		0x1CEEA970,
+		
+		0x1D08DFF0,
+		0x1D08E070,
+		0x1D08E0F0,
+		0x1D08E170,
+		0x1D2316F0,
+		0x1D231770,
+		0x1D2317F0,
+		0x1D231870,
+		0x1D3D5070,
+		0x1D3D50F0,
+		0x1D3D5170,
+		0x1D3D51F0,
+		0x1D5786F0,
+		0x1D578770,
+		0x1D5787F0,
+		0x1D578870,
+		0x1D71BC70,
+		0x1D71BCF0,
+		0x1D71BD70,
+		0x1D71BDF0,
+		0x1D8BF370,
+		0x1D8BF3F0,
+		0x1D8BF470,
+		0x1D8BF4F0,
+		0x1DA625F0,
+		0x1DA62670,
+		0x1DA626F0,
+		0x1DA62770,
+		0x1DC8B2F0,
+		0x1DC8B370,
+		0x1DC8B3F0,
+		0x1DC8B470,
+		0x1DC8B4F0,
+		0x1DC8B570,
+		0x1DC8B5F0,
+		0x1DE6ABB0,
+		0x1DE6AC30,
+		0x1DE6ACB0,
+		0x1DE6AD30,
+		
+		0x1E04A190,
+		0x1E04A210,
+		0x1E04A290,
+		
+		0x1F37F570,
+		0x1F37F5F0,
+		0x1F37F670,
+		0x1F37F6F0,
+		0x1F5D00F0,
+		0x1F5D0170,
+		0x1F5D01F0,
+		0x1F5D0270,
+		0x1FADFE30,
+		0x1FADFEB0,
+		0x1FADFF30,
+		0x1FADFFB0,
+		0x1FAE0030,
+		0x1FAE00B0,
+		0x1FAE0130,
+		0x1FC65E70,
+		0x1FC65EF0,
+		0x1FC65F70,
+		0x1FC65FF0,
+		0x1FC66070,
+		0x1FE02FF0,
+		0x1FE03070,
+		0x1FE030F0,
+		
+		0x2002C880,
+		0x2002C900,
+		0x2002C980,
+		0x2002CA00,
+		0x20258D70,
+		0x20258DF0,
+		0x20258E70,
+		0x20258EF0,
+		0x20258F70,
+		0x20258FF0,
+		0x20259070,
+		0x202590F0,
+		0x2044BB10,
+		0x2044BB90,
+		0x20803A10,
+		0x20803A90,
+		0x20803B10,
+		0x20803B90,
+		
+		0x209E4A70,
+		0x209E4AF0,
+		0x209E4B70,
+		0x209E4BF0,
+		0x209E4C70,
+		0x209E4CF0,
+		0x209E4D70,
+		
+		0x21B41D90,
+		0x21B41E10,
+		0x21B41E90,
+		0x21B41F10,
+		0x21B41F90,
+		0x21B42010,
+		0x21D02D80,
+		0x21D02E00,
+		0x21D02E80,
+		0x21D02F00,
+		0x21EE5790,
+		0x21EE5810,
+		0x21EE5890,
+		0x21EE5910,
+		
+		0x229AB2B0,
+		0x229AB330,
+		0x229AB3B0,
+		0x229AB430,
+		0x229AB4B0,
+		0x22B653F0,
+		
+		0x23760600,
+		0x23760680,
+		0x23760700,
+		0x23760780,
+		0x238EB070,
+		0x238EB0F0,
+		0x238EB170,
+		0x238EB1F0,
+		0x23CE2190,
+		0x23CE2210,
+		0x23CE2290,
+		0x23CE2310,
+		0x23CE2390,
+		0x23ED4990,
+		0x23ED4A10,
+		0x23ED4A90,
+		0x23ED4B10,
+		
+		0x240C7B10,
+		0x240C7B90,
+		0x240C7C10,
+		0x240C7C90,
+		0x242B5590,
+		0x242B5690,
+		0x242B5710,
+		0x242B5790,
+		0x244ABD10,
+		0x244ABD90,
+		0x244ABE10,
+		0x244ABE90,
+		0x244ABF10,
+		0x24671C70,
+		0x24671CF0,
+		0x24671D70,
+		0x24671DF0,
+		0x24835F70,
+		0x24835FF0,
+		0x24836070,
+		0x248360F0,
+		0x24836170,
+		0x248361F0,
+		0x24A22C90,
+		0x24A22D10,
+		0x24A22D90,
+		0x24A22E10,
+		0x24BDCF70,
+		0x24BDCFF0,
+		0x24BDD070,
+		0x24DA0E70,
+		0x24DA0EF0,
+		0x24DA0F70,
+		0x24DA0FF0,
+		0x24DA1070,
+		
+		0x250F7200,
+		0x250F7300,
+		0x250F7380,
+		0x250F7400,
+		0x252B3860,
+		0x252B38E0,
+		0x252B3960,
+		0x25471870,
+		0x254718F0,
+		0x25471970,
+		0x256369F0,
+		0x25636A70,
+		0x25636AF0,
+		0x25636B70,
+		0x25636BF0,
+		0x257DC570,
+		0x257DC5F0,
+		0x257DC670,
+		0x257DC6F0,
+		0x257DC770,
+		0x257DC7F0,
+		0x25910870,
+		0x259108F0,
+		0x25910970,
+		0x25CDDC70,
+		0x25ED93F0,
+		0x25ED9470,
+		0x25ED94F0,
+		0x25ED9570,
+		0x25ED95F0,
+		0x260350F0,
+		0x26035170,
+		0x260351F0,
+		0x26035270,
+		0x260352F0,
+		0x26237AF0,
+		0x26237BF0,
+		0x26237C70,
+		0x26237CF0,
+		0x26237D70,
+		0x26237DF0,
+		0x263D9760,
+		0x263D97E0,
+		0x265E8070,
+		0x265E80F0,
+		0x265E8170,
+		0x265E81F0,
+		0x265E82F0,
+		0x265E8370,
+		0x267F7D70,
+		0x267F7DF0,
+		0x267F7E70,
+		0x267F7EF0,
+		0x267F7F70,
+		0x267F7FF0,
+		0x267F8070,
+		0x267F80F0,
+		0x26997680,
+		0x26997700,
+		0x26997780,
+		0x26997800,
+		0x26997880,
+		0x26B38100,
+		0x26B38180,
+		0x26B38200,
+		0x26B38280,
+		0x26B38300,
+		0x26CD7E80,
+		0x26CD7F00,
+		0x26CD7F80,
+		0x26CD8000,
+		0x26CD8080,
+		0x26E78180,
+		0x26E78200,
+		0x26E78280,
+		0x26E78300,
+		0x26E78380,
+		0x26FBED80,
+		0x26FBEE00,
+		
+		0x270F71F0,
+		0x270F7270,
+		0x272D5FF0,
+		0x272D6070,
+		0x274B4AE0,
+		0x276AB970,
+		0x276AB9F0,
+		0x276ABA70,
+		0x276ABAF0,
+		0x278A0F70,
+		0x278A0FF0,
+		0x278A1070,
+		0x278A10F0,
+		0x279D1CF0,
+	};
+int torchesLEN = *(&torches + 1) - torches;
+
+		//TODO: 
+		/*
+			figure out which addresses corrispond to which torch in the game.
+			
+		*/
+
+void randomize_torchsanity(FILE* fp)
+{
+	int items_no_progression[] = 
+	{
+		0x01, 0x0C, 0x0D, 0x0E, 0x11, 0x12, 0x13, 0x14, 0x15, 0x19, 0x1B, 0x1F, 0x21, 0x22, 
+		0x2A, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x3B, 0x3C, 0x3D, 0x3E, 0x41, 0x43, 0x44,
+		0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D,
+		0x6E, 0x6F, 0x70, 0x71, 0x72, 0x73, 0x86, 0x8A, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98,
+		0x99, 0xA2, 0xA3, 0xA4, 0xA5, 0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF, 
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x00, 0x00, 0x00, 0x00, 0x00, 
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x00, 0x00, 0x00, 0x00, 0x00,
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x00, 0x00, 0x00, 0x00, 0x00,
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4,
+		0x01, 0x0C, 0x0D, 0x0E, 0x11, 0x12, 0x13, 0x14, 0x15, 0x19, 0x1B, 0x1F, 0x21, 0x22, 
+		0x2A, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x3B, 0x3C, 0x3D, 0x3E, 0x41, 0x43, 0x44,
+		0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D,
+		0x6E, 0x6F, 0x70, 0x71, 0x72, 0x73, 0x86, 0x8A, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98,
+		0x99, 0xA2, 0xA3, 0xA4, 0xA5, 0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF, 
+		0x00, 0x00, 0x00, 0x00, 0x00,
+		0xAA, 0xAB, 0xAC, 0xAD, 0xAE,
+		0xAA, 0xAB, 0xAC, 0xAD, 0xAE,
+		0xAA, 0xAB, 0xAC, 0xAD, 0xAE,
+		0xAA, 0xAB, 0xAC, 0xAD, 0xAE,
+		0xAA, 0xAB, 0xAC, 0xAD, 0xAE,
+		0x00, 0x00, 0x00, 0x00, 0x00,
+		0xAA, 0xAB, 0xAC, 0xAD, 0xAE,
+		0xAA, 0xAB, 0xAC, 0xAD, 0xAE,
+		0xAA, 0xAB, 0xAC, 0xAD, 0xAE,
+		0xAA, 0xAB, 0xAC, 0xAD, 0xAE,
+		0x00, 0x00, 0x00, 0x00, 0x00,
+		0xAA, 0xAB, 0xAC, 0xAD, 0xAE,
+		0xAA, 0xAB, 0xAC, 0xAD, 0xAE,
+		0xAA, 0xAB, 0xAC, 0xAD, 0xAE,
+		0xAA, 0xAB, 0xAC, 0xAD, 0xAE,
+		0xAA, 0xAB, 0xAC, 0xAD, 0xAE,
+		0xAA, 0xAB, 0xAC, 0xAD, 0xAE,
+		0xA5, 0xA5, 0xA5, 0xA5, 0xA5,
+		0x00, 0x00, 0x00, 0x00, 0x00,
+		
+		
+	};
+	int items_Length = *(&items_no_progression + 1) - items_no_progression;
+	
+	int randVal = 0;
+	unsigned char newByte = 0x00;
+	
+	int SIZE = 1;
+	unsigned char buffer[SIZE];
+	
+		int item_progression[] = {
+		0x7F, 0x80, 0x81, 0x82, 0x83,
+		0x02, 0x03, 0x05,
+		0x42,
+		0x55, 0x58, 0x5E,
+		0x86, 0x8D,
+	};
+
+	int invalid_overwrite_items[] =
+	{
+		0x7F, 0x80, 0x81, 0x82, 0x83,
+		0x02, 0x03, 0x05,
+		0x42,
+		0x55, 0x58, 0x5E,
+		0x86, 0x8D,
+		0x59, 0x5A, 0x5B, 0x5C, 0x5D,
+	};
+
+	int item_progression_LEN = sizeof(item_progression) / sizeof(int);
+	int invalid_LEN = sizeof(invalid_overwrite_items) / sizeof(int);
+	_Bool valid = true;
+	
+	for(int i = 0; i < torchesLEN; i++)
+	{
+		valid = true;
+		fseek(fp, torches[i], SEEK_SET);
+		randVal = rand() % items_Length; 
+		fread(buffer,sizeof(buffer),1,fp);
+		for(int j = 0; j < invalid_LEN; j++)
+		{
+			if(buffer[0] == invalid_overwrite_items[j])
+			{
+				valid = false;
+				break;
+			}
+		}
+		if(valid)
+		{
+			newByte = items_no_progression[randVal];
+			fwrite(&newByte,sizeof(newByte),1,fp);
+		}
+	}
+
+
+	for(int i = 0; i < item_progression_LEN; i++)
+	{
+		if ((rand() % 100) < 33)
+		{
+			int randVal;
+			unsigned char buffer[1];
+			int attempts = 0;
+			_Bool valid;
+
+			do
+			{
+				valid = true;    // ← FIXED: reset each iteration
+
+				if (attempts++ > 5000)
+					break;       // ← safety to avoid infinite loop
+
+				randVal = rand() % torchesLEN;
+
+				fseek(fp, torches[randVal], SEEK_SET);
+				fread(buffer, sizeof(buffer), 1, fp);
+
+				for (int j = 0; j < invalid_LEN; j++)
+				{
+					if (buffer[0] == invalid_overwrite_items[j])
+					{
+						valid = false;
+						break;   // ← optional: small optimization
+					}
+				}
+
+			} while (!valid);
+
+			if (valid)
+			{
+				unsigned char newByte = item_progression[i];
+				fseek(fp, torches[randVal], SEEK_SET);
+				fwrite(&newByte, sizeof(newByte), 1, fp);
+			}
+		}
+	}
+}
 void randomize_orbs_and_whips_to_anywhere(FILE* fp)
 {
 	unsigned char newByte = 0x00;
@@ -5085,7 +6696,7 @@ void randomize_item_locations(FILE* fp)
 			0x6F01E8,
 			0x6F03E8,
 			0x6F0D68,
-			0x6FD368,
+			0x6FD368, //Axe Armor
 			0x6FC7E8,
 			0x761BE8,
 			0x6FCBE8,
@@ -6050,15 +7661,15 @@ void randomize_boss_loadzone(FILE* fp)
 		int ExitDoorNumber;
 	};
 	int BossEntranceAddress[] = {
-		0x82C30F0, //AND 0x82C3070
-		0xB147570,
-		0xD5410F0,
-		0x13551370,
-		0x133F0270,
-		0x19B5A1F0,
-		0x1A05E870,
-		0x237F94F0,
-		0x1F51DD70
+		0x82C30F0, //AND 0x82C3070 //UndeadParasite
+		0xB147570, //FlameElemental
+		0xD5410F0, //Golem
+		0x13551370, //Joachim
+		0x133F0270, //FrostElemental
+		0x19B5A1F0, //Medusa
+		0x1A05E870, //Thunder Elemental
+		0x237F94F0, //Succubus
+		0x1F51DD70 //ForgottenOne
 	};
 	int BossExitAdress[] = {
 		//TODO: fix
@@ -10821,6 +12432,16 @@ void create_Log(FILE* fp, FILE* fptr, int hashed_seed,const char text_seed[])
 				break;
 		}
 	}
+	
+	fprintf(fptr,"\n");
+	for(int i = 0; i < torchesLEN; i++)
+	{
+		fprintf(fptr,"0x%08X:",torches[i]); //torches[i] is a number of the form 0xABCDEFGH; 
+		fseek(fp,torches[i],SEEK_SET);
+		fread(buffer,sizeof(buffer),1,fp);
+		fprintf(fptr," %s\n",itemNames[buffer[0]]);
+	}
+	
 }
 
 void show_message(const char *message) {
@@ -11652,6 +13273,10 @@ static void on_submit(GtkWidget *widget, gpointer data) {
 				randomize_boss_music(fp);
 				player_chooses[20] = 'Y';
 			}
+			if(i == 46){
+				randomize_area_locking(fp);
+				player_chooses[22] = 'Y';
+			}
 		}
 	}
 	for(int i = 0; i < TOTAL_CHECKBOXES; i++){
@@ -11674,6 +13299,10 @@ static void on_submit(GtkWidget *widget, gpointer data) {
 			if( i == 42 ) {
 				randomize_save_rooms(fp);
 				player_chooses[18] = 'Y';
+			}
+			if(i == 45){
+				randomize_torchsanity(fp);
+				player_chooses[21] = 'Y';
 			}
 		}
 	}
@@ -11713,6 +13342,8 @@ static void on_submit(GtkWidget *widget, gpointer data) {
 		fprintf(fptr,"Random Save Rooms: %c  \n",(char)player_chooses[18]);
 		fprintf(fptr,"Orbs/Whips anywhere: %c \n",(char)player_chooses[19]);
 		fprintf(fptr,"music rando: %c \n",(char)player_chooses[20]);
+		fprintf(fptr,"torch-sanity: %c \n",(char)player_chooses[21]);
+		fprintf(fptr,"area_locking: %c \n",(char)player_chooses[22]);
 		//printf("end of log part 1 \n");
 	}
 	
@@ -11862,6 +13493,59 @@ static void on_submit(GtkWidget *widget, gpointer data) {
 
     gtk_main_quit(); // Close the window after submission
 }
+
+static void on_browse_iso_clicked(GtkButton *button, gpointer user_data) {
+    GtkEntry *entry = GTK_ENTRY(user_data);
+
+    GtkWidget *dialog = gtk_file_chooser_dialog_new(
+        "Select Lament of Innocence NTSC-U ISO",
+        NULL,
+        GTK_FILE_CHOOSER_ACTION_OPEN,
+        "_Cancel", GTK_RESPONSE_CANCEL,
+        "_Open", GTK_RESPONSE_ACCEPT,
+        NULL
+    );
+
+    GtkFileFilter *filter = gtk_file_filter_new();
+    gtk_file_filter_add_pattern(filter, "*.iso");
+    gtk_file_filter_set_name(filter, "ISO Files");
+    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter);
+
+    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+        char *filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
+        gtk_entry_set_text(entry, filename);
+        g_free(filename);
+    }
+
+    gtk_widget_destroy(dialog);
+}
+// Callback function for browsing Spoiler Log (.txt)
+static void on_browse_spoiler_clicked(GtkButton *button, gpointer user_data) {
+    GtkEntry *entry = GTK_ENTRY(user_data);
+
+    GtkWidget *dialog = gtk_file_chooser_dialog_new(
+        "Select Spoiler Log (.txt)",
+        NULL,
+        GTK_FILE_CHOOSER_ACTION_SAVE,  // Using SAVE because it’s for output file
+        "_Cancel", GTK_RESPONSE_CANCEL,
+        "_Save", GTK_RESPONSE_ACCEPT,
+        NULL
+    );
+
+    GtkFileFilter *filter = gtk_file_filter_new();
+    gtk_file_filter_add_pattern(filter, "*.txt");
+    gtk_file_filter_set_name(filter, "Text Files");
+    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter);
+
+    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+        char *filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
+        gtk_entry_set_text(entry, filename);
+        g_free(filename);
+    }
+
+    gtk_widget_destroy(dialog);
+}
+
 int main(int argc, char *argv[]) {  
 	gtk_init(&argc, &argv);
 	srand(time(NULL));
@@ -11888,14 +13572,24 @@ int main(int argc, char *argv[]) {
     GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);  
     gtk_container_add(GTK_CONTAINER(window), vbox);  
 
-    // Create labeled entry fields  
-    GtkWidget *label1 = gtk_label_new("Filepath to Castlevania: Lament of Innocence NTSC-U ISO");  
-    gtk_box_pack_start(GTK_BOX(vbox), label1, FALSE, FALSE, 0);  
+   // --- Row: ISO File Path ---
+	GtkWidget *hbox1 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+	gtk_box_pack_start(GTK_BOX(vbox), hbox1, FALSE, FALSE, 0);
 
-    GtkWidget *entry1 = gtk_entry_new();  
-    gtk_widget_set_size_request(entry1, -1, 25); // Set height to 25px
-    gtk_box_pack_start(GTK_BOX(vbox), entry1, FALSE, FALSE, 0);
+	GtkWidget *label1 = gtk_label_new("Filepath to Castlevania: Lament of Innocence NTSC-U ISO");
+	gtk_box_pack_start(GTK_BOX(hbox1), label1, FALSE, FALSE, 0);
+
+	GtkWidget *entry1 = gtk_entry_new();
+	gtk_widget_set_size_request(entry1, 600, 25);
+	gtk_box_pack_start(GTK_BOX(hbox1), entry1, TRUE, TRUE, 0);
 	enable_drag_drop(entry1);
+
+	// Create Browse button
+	GtkWidget *browse1 = gtk_button_new_with_label("Browse…");
+	gtk_box_pack_start(GTK_BOX(hbox1), browse1, FALSE, FALSE, 0);
+
+	// Connect button to handler
+	g_signal_connect(browse1, "clicked", G_CALLBACK(on_browse_iso_clicked), entry1);
 
     GtkWidget *label2 = gtk_label_new("Seed (leave blank for random)");  
     gtk_box_pack_start(GTK_BOX(vbox), label2, FALSE, FALSE, 0);  
@@ -11907,10 +13601,18 @@ int main(int argc, char *argv[]) {
     GtkWidget *label3 = gtk_label_new("Filepath for Spoiler Log (.txt document)");  
     gtk_box_pack_start(GTK_BOX(vbox), label3, FALSE, FALSE, 0);  
 
+		// --- Row: Spoiler Log File Path ---
+	GtkWidget *hbox3 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+	gtk_box_pack_start(GTK_BOX(vbox), hbox3, FALSE, FALSE, 0);
+
 	GtkWidget *entry3 = gtk_entry_new();
-	gtk_widget_set_size_request(entry3, -1, 25);
-	gtk_box_pack_start(GTK_BOX(vbox), entry3, FALSE, FALSE, 0); 
+	gtk_widget_set_size_request(entry3, 600, 25);
+	gtk_box_pack_start(GTK_BOX(hbox3), entry3, TRUE, TRUE, 0);
 	enable_drag_drop(entry3);
+
+	GtkWidget *browse3 = gtk_button_new_with_label("Browse…");
+	gtk_box_pack_start(GTK_BOX(hbox3), browse3, FALSE, FALSE, 0);
+	g_signal_connect(browse3, "clicked", G_CALLBACK(on_browse_spoiler_clicked), entry3);
 
    // Create a scrolled window for the checkboxes  
     GtkWidget *scrolled_window = gtk_scrolled_window_new(NULL, NULL);  
@@ -11931,7 +13633,9 @@ int main(int argc, char *argv[]) {
         "QoL start with Gold,\n MP, and Hearts", "QoL make key items\n not be on drops", "QoL item limits", "Start with Skills", "Extension", "Draw Up",
         "Vertical High", "Rising Shot", "Fast Rising", "Spinning Blast", "Energy Blast",
         "Sonic Edge", "A Extension 1", "A Extension 2", "Step Attack", "Falcon Claw",
-        "Quick Step", "Quick Step 2", "Perfect Guard", "check_seed", "fake/trap items", "pumpkin subweapons", "randomize \nSave Rooms", "orbs/whips \nanywhere","music rando",    };
+        "Quick Step", "Quick Step 2", "Perfect Guard", "check_seed", "fake/trap items", "pumpkin subweapons", "randomize \nSave Rooms", "orbs/whips \nanywhere","music rando",
+		"Torch-sanity","AreaLocking",
+		};
 	
 	const gchar *checkbox_tooltips[TOTAL_CHECKBOXES] = {
 		"Randomize What boss door goes to which boss", "Randomize enemy HP", "Randomize enemy tolerance and weakness", "", "Randomize relic MP drain between the vanilla values",
@@ -11942,7 +13646,8 @@ int main(int argc, char *argv[]) {
 		"Enable Vertical High", "Enable Rising Shot", "Enable Fast Rising", "Enable Spinning Blast", "Enable Energy Blast",
 		"Enable Sonic Edge", "Enable A Extension 1", "Enable A Extension 2", "Enable Step Attack", "Enable Falcon Claw",
 		"Enable Quick Step", "Enable Quick Step 2", "Enable Perfect Guard", "Check seed for completability",
-		"Enable fake/trap items\n Items named 'Sylph's Feather won't do\n what the model would imply", "pumpkin subweapons instead of normal for some", "Randomize Save Rooms", "removes the orb/whip from the boss \nand places them anywhere", "randomizes some 'mostly' boss music", 
+		"Enable fake/trap items\n Items named 'Sylph's Feather won't do\n what the model would imply", "pumpkin subweapons instead of normal for some", "Randomize Save Rooms", "removes the orb/whip from the boss \nand places them anywhere", "randomizes some 'mostly' boss music",
+		"Lets 'most' torches in the game have item drops in them\nTHIS IS STILL IN DEVELOPMENT","Uses the colored keys to lock the areas\nThis likely breaks the standard functionality\nThe keys are set to be in 'random' torches"
 	};
 	
 	// Create checkboxes and apply the 'checkbox-label' class from CSS
