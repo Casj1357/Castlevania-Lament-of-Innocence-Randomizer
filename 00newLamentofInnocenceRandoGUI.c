@@ -10,11 +10,12 @@
 #include <json-c/json.h> // Requires json-c librar
 #include <pango/pango.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 #define ROWS 6
 #define COLS 8
-#define TOTAL_CHECKBOXES 47
-#define TOTAL_USED_CHECKBOXES 47
+#define TOTAL_CHECKBOXES 48
+#define TOTAL_USED_CHECKBOXES 48
 
 #define PRESET_FILE "00preset.json"
 
@@ -30,6 +31,7 @@ typedef struct {
 	GtkWidget *random_seed_button;
     GtkWidget *save_button;  // Fix: Add missing member
     GtkWidget *submit_button; // Fix: Add missing member
+	GtkWidget *golden_knight_entry;
 } CheckBoxData;
 
 void scale_text(GtkWidget *widget, int size) {
@@ -141,6 +143,15 @@ void load_preset(CheckBoxData *cb_data) {
     if (json_value) {
         gtk_entry_set_text(cb_data->entries[2], json_object_get_string(json_value));
     }
+	
+	// Load Golden Knight chance
+	json_value = json_object_object_get(root, "golden_knight_chance");
+	if (json_value) {
+		gtk_entry_set_text(GTK_ENTRY(cb_data->golden_knight_entry), json_object_get_string(json_value));
+	} else {
+		gtk_entry_set_text(GTK_ENTRY(cb_data->golden_knight_entry), "85"); // default
+	}
+
 
     // Load checkbox states
     json_value = json_object_object_get(root, "checkboxes");
@@ -170,6 +181,14 @@ void save_preset(GtkWidget *widget, CheckBoxData *cb_data) {
     json_object_object_add(root, "iso_path", json_object_new_string(gtk_entry_get_text(cb_data->entries[0])));
     json_object_object_add(root, "seed", json_object_new_string(gtk_entry_get_text(cb_data->entries[1])));
     json_object_object_add(root, "spoiler_log", json_object_new_string(gtk_entry_get_text(cb_data->entries[2])));
+
+	// Save Golden Knight chance
+	json_object_object_add(
+		root,
+		"golden_knight_chance",
+		json_object_new_string(gtk_entry_get_text(GTK_ENTRY(cb_data->golden_knight_entry)))
+	);
+
 
     // Save checkbox states
     for (int i = 0; i < 50; i++) {
@@ -239,7 +258,9 @@ void give_information_about_everything(GtkWidget *parent)
                                     "to be able to get to the final bosses.\n"
                                     "(That does NOT mean you need to get all the orbs to enter the Pagoda.)\n"
 									"WARNING: If you leave the Golem boss fight after placing the E tablet,\n"
-                                    "you will NOT be able to fight him again.");
+                                    "you will NOT be able to fight him again.\n"
+									"\nTorch and enemy randomization still need tested!\n");
+									
 	gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
 
@@ -250,7 +271,7 @@ static void on_show_more_toggled(GtkToggleButton *toggle_button, gpointer data) 
 
     // Show or hide checkboxes 25 to 40 based on the toggle state
     gboolean active = gtk_toggle_button_get_active(toggle_button);
-    for (int i = 24; i < 40; i++) {
+    for (int i = 24; i < 39; i++) {
         if (active) {
             gtk_widget_show(cb_data->checkboxes[i]);
         } else {
@@ -289,6 +310,8 @@ int TODO(FILE* fp)
 	flip left vs right paths per areas...
 	
 	more hints?
+	
+	enemy_randomization to all enemies available
 	
 	*/
 	return 1;
@@ -4282,8 +4305,8 @@ void call_setup(FILE* fp)
 			printf("current is 0x%x\n",buffer[0]);
 		}
 	}
-	setup_destroy_joachim_mode(fp); //REQUIRE
-	setup_destroy_pumpkin_mode(fp); //REQUIRE
+	setup_destroy_joachim_mode(fp); //REQUIRE ... might be able to use enemy randomization?
+	setup_destroy_pumpkin_mode(fp); //REQUIRE ... should technically work with standard randomization (torches just 'harder')?
 	setup_enemies(fp); //REQUIRE
 		//setup_destroy_enemy(fp);
 	int* item_list = setup_what_items(fp);
@@ -4297,6 +4320,7723 @@ void call_setup(FILE* fp)
 }
 
 //randomization
+void randomize_Golden_Knight_to_Boss(FILE* fp,int chance)
+{
+	//75% chance to happen
+	int randVal;
+	unsigned char newByte = 0x4F;
+	
+	randVal = rand() % 100;
+	if(randVal <= chance) //choose your own?
+	{
+		randVal = rand() % 6;
+		switch(randVal)
+		{
+			case 0: 
+				newByte = 0x64;
+				break;
+			case 1:
+				newByte = 0x12;
+				break;
+			case 2:
+				newByte = 0x63;
+				break;
+			case 3:
+				newByte = 0x3D;
+				break;
+			case 4:
+				newByte = 0x59;
+				break;
+			case 5:
+				newByte = 0x1C;
+				break;
+			default:
+				break;
+		}
+		
+		fseek(fp,0x209E56B2,SEEK_SET);
+		fwrite(&newByte,sizeof(newByte),1,fp);
+		fseek(fp,0x209E56BC,SEEK_SET);
+		fwrite(&newByte,sizeof(newByte),1,fp);
+		fseek(fp,0x209E56F2,SEEK_SET);
+		fwrite(&newByte,sizeof(newByte),1,fp);
+	}
+	//Flame Elemental, Frost Elemental, Thunder Elemental, Doppelganger (red), Doppelganger (blue), Golem
+	
+}
+unsigned char enemy_type(FILE* fp,unsigned char enemy_ID)
+{
+	unsigned char type = 0x00;
+	int randVal;
+	switch(enemy_ID)
+	{
+		case 0x01: case 0x28: //spirit & Rune Spirit
+			randVal = rand() % 2;
+			if(randVal == 0)
+				type = 0x01;
+			if(randVal == 1)
+				type = 0x28;
+			break;
+		case 0x04: case 0x35: //Mad Diver & Evil Stabber
+			randVal = rand() % 2;
+			if(randVal == 0)
+				type = 0x04;
+			if(randVal == 1)
+				type = 0x35;
+			break;
+		case 0x05: case 0x29: //Fish Man & Merman
+			randVal = rand() % 2;
+			if(randVal == 0)
+				type = 0x05;
+			if(randVal == 1)
+				type = 0x29;
+			break;
+		case 0x07: case 0x65: case 0x66: case 0x25: //Zombie & Hanged man & Frost Zombie & Flame Zombie
+			randVal = rand() % 4;
+			if(randVal == 0)
+				type = 0x07;
+			if(randVal == 1)
+				type = 0x65;
+			if(randVal == 2)
+				type = 0x66;
+			if(randVal == 3)
+				type = 0x25;
+			break;
+		case 0x09: case 0x13: case 0x0E: case 0x39: case 0x0B: //Evil Sword & Chaos Sword & Thunder Sword & Flame Sword & Frost Sword
+			randVal = rand() % 5;
+			if(randVal == 0)
+				type = 0x09;
+			if(randVal == 1)
+				type = 0x13;
+			if(randVal == 2)
+				type = 0x0E;
+			if(randVal == 3)
+				type = 0x39;
+			if(randVal == 4)
+				type = 0x0B;
+			break;
+		case 0x0A: case 0x15: case 0x20: case 0x2E: 
+			randVal = rand() % 4;
+			if(randVal == 0)
+				type = 0x0A;
+			if(randVal == 1)
+				type = 0x15;
+			if(randVal == 2)
+				type = 0x20;
+			if(randVal == 3)
+				type = 0x2E;
+			break;
+		case 0x0D: case 0x0F: case 0x10: case 0x11:
+			randVal = rand() % 4;
+			if(randVal == 0)
+				type = 0x0D;
+			if(randVal == 1)
+				type = 0x0F;
+			if(randVal == 2)
+				type = 0x10;
+			if(randVal == 3)
+				type = 0x11;
+			break;
+		case 0x17: case 0x30: 
+			randVal = rand() % 2;
+			if(randVal == 0)
+				type = 0x17;
+			if(randVal == 1)
+				type = 0x30;
+			break;
+		case 0x1E: case 0x1F: case 0x47: case 0x27:
+			randVal = rand() % 4;
+			if(randVal == 0)
+				type = 0x1E;
+			if(randVal == 1)
+				type = 0x1F;
+			if(randVal == 2)
+				type = 0x47;
+			if(randVal == 3)
+				type = 0x27;
+			break;
+		case 0x22: case 0x23: case 0x24:
+			randVal = rand() % 3;
+			if(randVal == 0)
+				type = 0x22;
+			if(randVal == 1)
+				type = 0x23;
+			if(randVal == 2)
+				type = 0x24;
+			break;
+		case 0x4C: case 0x4E: case 0x61:
+			randVal = rand() % 3;
+			if(randVal == 0)
+				type = 0x4C;
+			if(randVal == 1)
+				type = 0x4E;
+			if(randVal == 2)
+				type = 0x61;
+			break;
+		case 0x53: case 0x57: case 0x58:
+			randVal = rand() % 3;
+			if(randVal == 0)
+				type = 0x53;
+			if(randVal == 1)
+				type = 0x57;
+			if(randVal == 2)
+				type = 0x58;
+			break;
+		case 0x62: case 0x69:
+			randVal = rand() % 2;
+			if(randVal == 0)
+				type = 0x62;
+			if(randVal == 1)
+				type = 0x69;
+			break;
+		case 0x6A: case 0x6B: case 0x6C: case 0x6D:
+			randVal = rand() % 4;
+			if(randVal == 0)
+				type = 0x6A;
+			if(randVal == 1)
+				type = 0x6B;
+			if(randVal == 2)
+				type = 0x6C;
+			if(randVal == 3)
+				type = 0x6D;
+			break;
+		case 0x6F: case 0x70: case 0x71:
+			randVal = rand() % 3;
+			if(randVal == 0)
+				type = 0x6F;
+			if(randVal == 1)
+				type = 0x70;
+			if(randVal == 2)
+				type = 0x71;
+			break;
+		default:
+			type = enemy_ID;
+			break;
+	}
+	return type;
+}
+
+void randomize_enemy_spawns(FILE* fp,int chance)
+{
+	/* This is going to be a massive function...*/
+	/* The arrays of tables per each room are going to use several thousand lines... */
+
+//rooms must be excluded: 0x23761BB2, 0x08016CB2 , TODO: there are a few more (but we will just exclude the enemies for now)
+
+int enemy_room_1[] = {
+    //num enemy types: 2, num enemies 4,
+    //0x0226D884, 0x0226D888,
+    0x02,
+    //room spawners:,
+    0x0226D8B2,
+    //values: 01 00 03 00 0F 00  //0x03 - Red Skeleton,
+    //0x0226D8BC, //+0x0A address,
+    //room spawners:,
+    0x0226D8C6,
+    //values: 01 00 61 00 0F 00  //0x61 - Wolf Skeleton,
+    //0x0226D8D0, //+0x0A address,
+    //1: 01 00 03 00 04 00,
+    0x0226D8E2,
+    //2: 01 00 03 00 04 00,
+    0x0226D962,
+    //3: 01 00 61 00 04 00,
+    0x0226D9E2,
+    //4: 01 00 61 00 04 00,
+    0x0226DA62
+};
+
+int enemy_room_2[] = {
+    //num enemy types: 3, num enemies 7,
+    //0x02A3C404, 0x02A3C408,
+    0x03,
+    //room spawners:,
+    0x02A3C432,
+    //values: 01 00 42 00 0F 00  //0x42 - ???,
+    //0x02A3C43C, //+0x0A address,
+    //room spawners:,
+    0x02A3C446,
+    //values: 01 00 67 00 02 00  //0x67 - Spartacus,
+    //0x02A3C450, //+0x0A address,
+    //room spawners:,
+    0x02A3C45A,
+    //values: 01 00 0C 00 0F 00  //0x0C - Skeleton,
+    //0x02A3C464, //+0x0A address,
+    //1: 01 00 42 00 04 00,
+    0x02A3C472,
+    //2: 01 00 0C 00 04 00,
+    0x02A3C4F2,
+    //3: 01 00 0C 00 04 00,
+    0x02A3C572,
+    //4: 01 00 0C 00 04 00,
+    0x02A3C5F2,
+    //5: 01 00 0C 00 04 00,
+    0x02A3C672,
+    //6: 01 00 67 00 04 00,
+    0x02A3C6F2,
+    //7: 01 00 67 00 04 00,
+    0x02A3C772
+};
+
+int enemy_room_3[] = {
+    //num enemy types: 5, num enemies 17,
+    //0x02C28F84, 0x02C28F88,
+    0x05,
+    //room spawners:,
+    0x02C28FB2,
+    //values: 01 00 2F 00 02 00  //0x2F - Phantom,
+    //0x02C28FBC, //+0x0A address,
+    //room spawners:,
+    0x02C28FC6,
+    //values: 01 00 0C 00 0D 00  //0x0C - Skeleton,
+    //0x02C28FD0, //+0x0A address,
+    //room spawners:,
+    0x02C28FDA,
+    //values: 01 00 1A 00 0F 00  //0x1A - Heavy Armor,
+    //0x02C28FE4, //+0x0A address,
+    //room spawners:,
+    0x02C28FEE,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x02C28FF8, //+0x0A address,
+    //room spawners:,
+    0x02C29002,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x02C2900C, //+0x0A address,
+    //1: 01 00 1A 00 07 00,
+    0x02C29022,
+    //2: 01 00 1A 00 07 00,
+    0x02C290A2,
+    //3: 01 00 0C 00 07 00,
+    0x02C29122,
+    //4: 01 00 0C 00 07 00,
+    0x02C291A2,
+    //5: 01 00 0C 00 07 00,
+    0x02C29222,
+    //6: 01 00 0C 00 07 00,
+    0x02C292A2,
+    //7: 01 00 0C 00 07 00,
+    0x02C29322,
+    //8: 01 00 0C 00 07 00,
+    0x02C293A2,
+    //9: 01 00 0C 00 07 00,
+    0x02C29422,
+    //10: 01 00 0C 00 07 00,
+    0x02C294A2,
+    //11: 01 00 0C 00 07 00,
+    0x02C29522,
+    //12: 01 00 0C 00 07 00,
+    0x02C295A2,
+    //13: 01 00 2F 00 14 00,
+    0x02C29622,
+    //14: 01 00 4B 00 06 00,
+    0x02C296A2,
+    //15: 01 00 54 00 04 00,
+    0x02C29722,
+    //16: 01 00 54 00 04 00,
+    0x02C297A2,
+    //17: 01 00 54 00 04 00,
+    0x02C29822
+};
+
+int enemy_room_4[] = {
+    //num enemy types: 4, num enemies 5,
+    //0x02DF8704, 0x02DF8708,
+    0x04,
+    //room spawners:,
+    0x02DF8732,
+    //values: 01 00 1E 00 0F 00  //0x1E - Ghost Warrior,
+    //0x02DF873C, //+0x0A address,
+    //room spawners:,
+    0x02DF8746,
+    //values: 01 00 2A 00 02 00  //0x2A - Vassago,
+    //0x02DF8750, //+0x0A address,
+    //room spawners:,
+    0x02DF875A,
+    //values: 01 00 0C 00 0D 00  //0x0C - Skeleton,
+    //0x02DF8764, //+0x0A address,
+    //room spawners:,
+    0x02DF876E,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x02DF8778, //+0x0A address,
+    //1: 01 00 1E 00 14 00,
+    0x02DF8782,
+    //2: 01 00 0C 00 14 00,
+    0x02DF8802,
+    //3: 01 00 2A 00 05 00,
+    0x02DF8882,
+    //4: 01 00 2A 00 05 00,
+    0x02DF8902,
+    //5: 01 00 54 00 04 00,
+    0x02DF8982
+};
+
+int enemy_room_5[] = {
+    //num enemy types: 4, num enemies 9,
+    //0x02FC9204, 0x02FC9208,
+    0x04,
+    //room spawners:,
+    0x02FC9232,
+    //values: 01 00 1E 00 0D 00  //0x1E - Ghost Warrior,
+    //0x02FC923C, //+0x0A address,
+    //room spawners:,
+    0x02FC9246,
+    //values: 01 00 2A 00 02 00  //0x2A - Vassago,
+    //0x02FC9250, //+0x0A address,
+    //room spawners:,
+    0x02FC925A,
+    //values: 01 00 11 00 0F 00  //0x11 - Skeleton Swordsman,
+    //0x02FC9264, //+0x0A address,
+    //room spawners:,
+    0x02FC926E,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x02FC9278, //+0x0A address,
+    //1: 01 00 1E 00 04 00,
+    0x02FC9282,
+    //2: 01 00 11 00 04 00,
+    0x02FC9302,
+    //3: 01 00 11 00 04 00,
+    0x02FC9382,
+    //4: 01 00 11 00 04 00,
+    0x02FC9402,
+    //5: 01 00 1E 00 04 00,
+    0x02FC9482,
+    //6: 01 00 2A 00 14 00,
+    0x02FC9502,
+    //7: 01 00 54 00 04 00,
+    0x02FC9582,
+    //8: 01 00 54 00 04 00,
+    0x02FC9602,
+    //9: 01 00 54 00 04 00,
+    0x02FC9682
+};
+
+int enemy_room_6[] = {
+    //num enemy types: 3, num enemies 9,
+    //0x03199D04, 0x03199D08,
+    0x03,
+    //room spawners:,
+    0x03199D32,
+    //values: 01 00 11 00 0F 00  //0x11 - Skeleton Swordsman,
+    //0x03199D3C, //+0x0A address,
+    //room spawners:,
+    0x03199D46,
+    //values: 01 00 28 00 0F 00  //0x28 - Rune Spirit,
+    //0x03199D50, //+0x0A address,
+    //room spawners:,
+    0x03199D5A,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x03199D64, //+0x0A address,
+    //1: 01 00 28 00 04 00,
+    0x03199D72,
+    //2: 01 00 11 00 04 00,
+    0x03199DF2,
+    //3: 01 00 11 00 04 00,
+    0x03199E72,
+    //4: 01 00 11 00 04 00,
+    0x03199EF2,
+    //5: 01 00 11 00 04 00,
+    0x03199F72,
+    //6: 01 00 11 00 04 00,
+    0x03199FF2,
+    //7: 01 00 54 00 04 00,
+    0x0319A072,
+    //8: 01 00 54 00 04 00,
+    0x0319A0F2,
+    //9: 01 00 54 00 04 00,
+    0x0319A172
+};
+
+int enemy_room_7[] = {
+    //num enemy types: 4, num enemies 5,
+    //0x0335FD84, 0x0335FD88,
+    0x04,
+    //room spawners:,
+    0x0335FDB2,
+    //values: 01 00 2A 00 02 00  //0x2A - Vassago,
+    //0x0335FDBC, //+0x0A address,
+    //room spawners:,
+    0x0335FDC6,
+    //values: 01 00 28 00 0F 00  //0x28 - Rune Spirit,
+    //0x0335FDD0, //+0x0A address,
+    //room spawners:,
+    0x0335FDDA,
+    //values: 01 00 0C 00 0D 00  //0x0C - Skeleton,
+    //0x0335FDE4, //+0x0A address,
+    //room spawners:,
+    0x0335FDEE,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0335FDF8, //+0x0A address,
+    //1: 01 00 28 00 14 00,
+    0x0335FE02,
+    //2: 01 00 0C 00 14 00,
+    0x0335FE82,
+    //3: 01 00 2A 00 05 00,
+    0x0335FF02,
+    //4: 01 00 2A 00 05 00,
+    0x0335FF82,
+    //5: 01 00 54 00 04 00,
+    0x03360002
+};
+
+int enemy_room_8[] = {
+    //num enemy types: 4, num enemies 9,
+    //0x03534F84, 0x03534F88,
+    0x04,
+    //room spawners:,
+    0x03534FB2,
+    //values: 01 00 61 00 0F 00  //0x61 - Wolf Skeleton,
+    //0x03534FBC, //+0x0A address,
+    //room spawners:,
+    0x03534FC6,
+    //values: 01 00 07 00 0D 00  //0x07 - Zombie,
+    //0x03534FD0, //+0x0A address,
+    //room spawners:,
+    0x03534FDA,
+    //values: 01 00 65 00 02 00  //0x65 - Hanged Man,
+    //0x03534FE4, //+0x0A address,
+    //room spawners:,
+    0x03534FEE,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x03534FF8, //+0x0A address,
+    //1: 01 00 61 00 04 00,
+    0x03535002,
+    //2: 01 00 61 00 04 00,
+    0x03535082,
+    //3: 01 00 61 00 04 00,
+    0x03535102,
+    //4: 01 00 07 00 04 00,
+    0x03535182,
+    //5: 01 00 07 00 04 00,
+    0x03535202,
+    //6: 01 00 65 00 04 00,
+    0x03535282,
+    //7: 01 00 65 00 04 00,
+    0x03535302,
+    //8: 01 00 54 00 04 00,
+    0x03535382,
+    //9: 01 00 54 00 04 00,
+    0x03535402
+};
+
+int enemy_room_9[] = {
+    //num enemy types: 4, num enemies 11,
+    //0x0370D384, 0x0370D388,
+    0x04,
+    //room spawners:,
+    0x0370D3B2,
+    //values: 01 00 1A 00 0F 00  //0x1A - Heavy Armor,
+    //0x0370D3BC, //+0x0A address,
+    //room spawners:,
+    0x0370D3C6,
+    //values: 01 00 03 00 0D 00  //0x03 - Red Skeleton,
+    //0x0370D3D0, //+0x0A address,
+    //room spawners:,
+    0x0370D3DA,
+    //values: 01 00 4F 00 02 00  //0x4F - Golden Knight,
+    //0x0370D3E4, //+0x0A address,
+    //room spawners:,
+    0x0370D3EE,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0370D3F8, //+0x0A address,
+    //1: 01 00 1A 00 07 00,
+    0x0370D402,
+    //2: 01 00 1A 00 07 00,
+    0x0370D482,
+    //3: 01 00 03 00 07 00,
+    0x0370D502,
+    //4: 01 00 03 00 07 00,
+    0x0370D582,
+    //5: 01 00 03 00 07 00,
+    0x0370D602,
+    //6: 01 00 03 00 07 00,
+    0x0370D682,
+    //7: 01 00 03 00 07 00,
+    0x0370D702,
+    //8: 01 00 03 00 07 00,
+    0x0370D782,
+    //9: 01 00 4F 00 14 00,
+    0x0370D802,
+    //10: 01 00 54 00 04 00,
+    0x0370D882,
+    //11: 01 00 54 00 04 00,
+    0x0370D902
+};
+
+int enemy_room_10[] = {
+    //num enemy types: 3, num enemies 5,
+    //0x038DF084, 0x038DF088,
+    0x03,
+    //room spawners:,
+    0x038DF0B2,
+    //values: 01 00 0C 00 0F 00  //0x0C - Skeleton,
+    //0x038DF0BC, //+0x0A address,
+    //room spawners:,
+    0x038DF0C6,
+    //values: 01 00 65 00 02 00  //0x65 - Hanged Man,
+    //0x038DF0D0, //+0x0A address,
+    //room spawners:,
+    0x038DF0DA,
+    //values: 01 00 17 00 0D 00  //0x17 - Skeleton Archer,
+    //0x038DF0E4, //+0x0A address,
+    //1: 01 00 0C 00 14 00,
+    0x038DF0F2,
+    //2: 01 00 17 00 14 00,
+    0x038DF172,
+    //3: 01 00 65 00 04 00,
+    0x038DF1F2,
+    //4: 01 00 65 00 04 00,
+    0x038DF272,
+    //5: 01 00 65 00 04 00,
+    0x038DF2F2
+};
+
+int enemy_room_11[] = {
+    //num enemy types: 4, num enemies 6,
+    //0x03AD6504, 0x03AD6508,
+    0x04,
+    //room spawners:,
+    0x03AD6532,
+    //values: 01 00 65 00 02 00  //0x65 - Hanged Man,
+    //0x03AD653C, //+0x0A address,
+    //room spawners:,
+    0x03AD6546,
+    //values: 01 00 17 00 02 00  //0x17 - Skeleton Archer,
+    //0x03AD6550, //+0x0A address,
+    //room spawners:,
+    0x03AD655A,
+    //values: 01 00 07 00 0D 00  //0x07 - Zombie,
+    //0x03AD6564, //+0x0A address,
+    //room spawners:,
+    0x03AD656E,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x03AD6578, //+0x0A address,
+    //1: 01 00 17 00 04 00,
+    0x03AD6582,
+    //2: 01 00 17 00 04 00,
+    0x03AD6602,
+    //3: 01 00 17 00 04 00,
+    0x03AD6682,
+    //4: 01 00 07 00 14 00,
+    0x03AD6702,
+    //5: 01 00 65 00 14 00,
+    0x03AD6782,
+    //6: 01 00 4B 00 06 00,
+    0x03AD6802
+};
+
+int enemy_room_12[] = {
+    //num enemy types: 3, num enemies 8,
+    //0x03C77284, 0x03C77288,
+    0x03,
+    //room spawners:,
+    0x03C772B2,
+    //values: 01 00 07 00 0D 00  //0x07 - Zombie,
+    //0x03C772BC, //+0x0A address,
+    //room spawners:,
+    0x03C772C6,
+    //values: 01 00 10 00 0F 00  //0x10 - Skeleton Knight,
+    //0x03C772D0, //+0x0A address,
+    //room spawners:,
+    0x03C772DA,
+    //values: 01 00 0A 00 02 00  //0x0A - Axe Armor,
+    //0x03C772E4, //+0x0A address,
+    //1: 01 00 07 00 04 00,
+    0x03C772F2,
+    //2: 01 00 10 00 04 00,
+    0x03C77372,
+    //3: 01 00 10 00 04 00,
+    0x03C773F2,
+    //4: 01 00 07 00 04 00,
+    0x03C77472,
+    //5: 01 00 10 00 04 00,
+    0x03C774F2,
+    //6: 01 00 10 00 04 00,
+    0x03C77572,
+    //7: 01 00 0A 00 04 00,
+    0x03C775F2,
+    //8: 01 00 0A 00 04 00,
+    0x03C77672
+};
+
+int enemy_room_13[] = {
+    //num enemy types: 2, num enemies 2,
+    //0x03E77704, 0x03E77708,
+    0x02,
+    //room spawners:,
+    0x03E77732,
+    //values: 01 00 10 00 0F 00  //0x10 - Skeleton Knight,
+    //0x03E7773C, //+0x0A address,
+    //room spawners:,
+    0x03E77746,
+    //values: 01 00 07 00 0F 00  //0x07 - Zombie,
+    //0x03E77750, //+0x0A address,
+    //1: 01 00 10 00 14 00,
+    0x03E77762,
+    //2: 01 00 07 00 14 00,
+    0x03E777E2
+};
+
+int enemy_room_14[] = {
+    //num enemy types: 3, num enemies 5,
+    //0x0401CB84, 0x0401CB88,
+    0x03,
+    //room spawners:,
+    0x0401CBB2,
+    //values: 01 00 10 00 0D 00  //0x10 - Skeleton Knight,
+    //0x0401CBBC, //+0x0A address,
+    //room spawners:,
+    0x0401CBC6,
+    //values: 01 00 67 00 02 00  //0x67 - Spartacus,
+    //0x0401CBD0, //+0x0A address,
+    //room spawners:,
+    0x0401CBDA,
+    //values: 01 00 1E 00 0F 00  //0x1E - Ghost Warrior,
+    //0x0401CBE4, //+0x0A address,
+    //1: 01 00 10 00 14 00,
+    0x0401CBF2,
+    //2: 01 00 1E 00 14 00,
+    0x0401CC72,
+    //3: 01 00 67 00 04 00,
+    0x0401CCF2,
+    //4: 01 00 67 00 04 00,
+    0x0401CD72,
+    //5: 01 00 67 00 04 00,
+    0x0401CDF2
+};
+
+int enemy_room_15[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x041D4D84, 0x041D4D88,
+    0x02,
+    //room spawners:,
+    0x041D4DB2,
+    //values: 01 00 07 00 0F 00  //0x07 - Zombie,
+    //0x041D4DBC, //+0x0A address,
+    //room spawners:,
+    0x041D4DC6,
+    //values: 01 00 28 00 0F 00  //0x28 - Rune Spirit,
+    //0x041D4DD0, //+0x0A address,
+    //1: 01 00 28 00 04 00,
+    0x041D4DE2,
+    //2: 01 00 28 00 04 00,
+    0x041D4E62,
+    //3: 01 00 07 00 04 00,
+    0x041D4EE2,
+    //4: 01 00 07 00 04 00,
+    0x041D4F62,
+    //5: 01 00 28 00 04 00,
+    0x041D4FE2,
+    //6: 01 00 28 00 04 00,
+    0x041D5062
+};
+
+int enemy_room_16[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x043CE704, 0x043CE708,
+    0x02,
+    //room spawners:,
+    0x043CE732,
+    //values: 01 00 28 00 0F 00  //0x28 - Rune Spirit,
+    //0x043CE73C, //+0x0A address,
+    //room spawners:,
+    0x043CE746,
+    //values: 01 00 10 00 0F 00  //0x10 - Skeleton Knight,
+    //0x043CE750, //+0x0A address,
+    //1: 01 00 28 00 04 00,
+    0x043CE762,
+    //2: 01 00 28 00 04 00,
+    0x043CE7E2,
+    //3: 01 00 28 00 04 00,
+    0x043CE862,
+    //4: 01 00 28 00 04 00,
+    0x043CE8E2,
+    //5: 01 00 10 00 04 00,
+    0x043CE962,
+    //6: 01 00 10 00 04 00,
+    0x043CE9E2
+};
+
+int enemy_room_17[] = {
+    //num enemy types: 4, num enemies 7,
+    //0x0484DC84, 0x0484DC88,
+    0x04,
+    //room spawners:,
+    0x0484DCB2,
+    //values: 01 00 67 00 02 00  //0x67 - Spartacus,
+    //0x0484DCBC, //+0x0A address,
+    //room spawners:,
+    0x0484DCC6,
+    //values: 01 00 10 00 0F 00  //0x10 - Skeleton Knight,
+    //0x0484DCD0, //+0x0A address,
+    //room spawners:,
+    0x0484DCDA,
+    //values: 01 00 17 00 0F 00  //0x17 - Skeleton Archer,
+    //0x0484DCE4, //+0x0A address,
+    //room spawners:,
+    0x0484DCEE,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0484DCF8, //+0x0A address,
+    //1: 01 00 10 00 16 00,
+    0x0484DD02,
+    //2: 01 00 17 00 14 00,
+    0x0484DD82,
+    //3: 01 00 67 00 06 00,
+    0x0484DE02,
+    //4: 01 00 67 00 06 00,
+    0x0484DE82,
+    //5: 01 00 67 00 06 00,
+    0x0484DF02,
+    //6: 01 00 67 00 06 00,
+    0x0484DF82,
+    //7: 01 00 54 00 04 00,
+    0x0484E002
+};
+
+int enemy_room_18[] = {
+    //num enemy types: 3, num enemies 4,
+    //0x049E4B84, 0x049E4B88,
+    0x03,
+    //room spawners:,
+    0x049E4BB2,
+    //values: 01 00 67 00 0F 00  //0x67 - Spartacus,
+    //0x049E4BBC, //+0x0A address,
+    //room spawners:,
+    0x049E4BC6,
+    //values: 01 00 61 00 0F 00  //0x61 - Wolf Skeleton,
+    //0x049E4BD0, //+0x0A address,
+    //room spawners:,
+    0x049E4BDA,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x049E4BE4, //+0x0A address,
+    //1: 01 00 67 00 14 00,
+    0x049E4BF2,
+    //2: 01 00 61 00 14 00,
+    0x049E4C72,
+    //3: 01 00 67 00 04 00,
+    0x049E4CF2,
+    //4: 01 00 54 00 04 00,
+    0x049E4D72
+};
+
+int enemy_room_19[] = {
+    //num enemy types: 4, num enemies 5,
+    //0x04B91784, 0x04B91788,
+    0x04,
+    //room spawners:,
+    0x04B917B2,
+    //values: 01 00 07 00 0F 00  //0x07 - Zombie,
+    //0x04B917BC, //+0x0A address,
+    //room spawners:,
+    0x04B917C6,
+    //values: 01 00 22 00 02 00  //0x22 - Astral Fighter,
+    //0x04B917D0, //+0x0A address,
+    //room spawners:,
+    0x04B917DA,
+    //values: 01 00 2A 00 0F 00  //0x2A - Vassago,
+    //0x04B917E4, //+0x0A address,
+    //room spawners:,
+    0x04B917EE,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x04B917F8, //+0x0A address,
+    //1: 01 00 07 00 16 00,
+    0x04B91802,
+    //2: 01 00 2A 00 14 00,
+    0x04B91882,
+    //3: 01 00 22 00 06 00,
+    0x04B91902,
+    //4: 01 00 22 00 06 00,
+    0x04B91982,
+    //5: 01 00 54 00 04 00,
+    0x04B91A02
+};
+
+int enemy_room_20[] = {
+    //num enemy types: 2, num enemies 2,
+    //0x04D06C84, 0x04D06C88,
+    0x02,
+    //room spawners:,
+    0x04D06CB2,
+    //values: 01 00 21 00 0F 00  //0x21 - Poison Zombie,
+    //0x04D06CBC, //+0x0A address,
+    //room spawners:,
+    0x04D06CC6,
+    //values: 01 00 22 00 0F 00  //0x22 - Astral Fighter,
+    //0x04D06CD0, //+0x0A address,
+    //1: 01 00 21 00 14 00,
+    0x04D06CE2,
+    //2: 01 00 22 00 14 00,
+    0x04D06D62
+};
+
+int enemy_room_21[] = {
+    //num enemy types: 2, num enemies 3,
+    //0x04E9DD84, 0x04E9DD88,
+    0x02,
+    //room spawners:,
+    0x04E9DDB2,
+    //values: 01 00 58 00 0F 00  //0x58 - Executioner,
+    //0x04E9DDBC, //+0x0A address,
+    //room spawners:,
+    0x04E9DDC6,
+    //values: 01 00 2A 00 0F 00  //0x2A - Vassago,
+    //0x04E9DDD0, //+0x0A address,
+    //1: 01 00 58 00 04 00,
+    0x04E9DDE2,
+    //2: 01 00 2A 00 14 00,
+    0x04E9DE62,
+    //3: 01 00 2A 00 14 00,
+    0x04E9DEE2
+};
+
+int enemy_room_22[] = {
+    //num enemy types: 2, num enemies 4,
+    //0x0502BC84, 0x0502BC88,
+    0x02,
+    //room spawners:,
+    0x0502BCB2,
+    //values: 01 00 22 00 0F 00  //0x22 - Astral Fighter,
+    //0x0502BCBC, //+0x0A address,
+    //room spawners:,
+    0x0502BCC6,
+    //values: 01 00 2A 00 0F 00  //0x2A - Vassago,
+    //0x0502BCD0, //+0x0A address,
+    //1: 01 00 2A 00 14 00,
+    0x0502BCE2,
+    //2: 01 00 22 00 04 00,
+    0x0502BD62,
+    //3: 01 00 22 00 04 00,
+    0x0502BDE2,
+    //4: 01 00 22 00 04 00,
+    0x0502BE62
+};
+
+int enemy_room_23[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x05323D84, 0x05323D88,
+    0x01,
+    //room spawners:,
+    0x05323DB2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x05323DBC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x05323DD2
+};
+
+int enemy_room_24[] = {
+    //num enemy types: 3, num enemies 5,
+    //0x05D24C04, 0x05D24C08,
+    0x03,
+    //room spawners:,
+    0x05D24C32,
+    //values: 01 00 3A 00 0F 00  //0x3A - Buckbaird,
+    //0x05D24C3C, //+0x0A address,
+    //room spawners:,
+    0x05D24C46,
+    //values: 01 00 03 00 0F 00  //0x03 - Red Skeleton,
+    //0x05D24C50, //+0x0A address,
+    //room spawners:,
+    0x05D24C5A,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x05D24C64, //+0x0A address,
+    //1: 01 00 3A 00 07 00,
+    0x05D24C72,
+    //2: 01 00 03 00 05 00,
+    0x05D24CF2,
+    //3: 01 00 03 00 05 00,
+    0x05D24D72,
+    //4: 01 00 03 00 05 00,
+    0x05D24DF2,
+    //5: 01 00 4B 00 06 00,
+    0x05D24E72
+};
+
+int enemy_room_25[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x05E7C504, 0x05E7C508,
+    0x02,
+    //room spawners:,
+    0x05E7C532,
+    //values: 01 00 08 00 0F 00  //0x08 - Bat,
+    //0x05E7C53C, //+0x0A address,
+    //room spawners:,
+    0x05E7C546,
+    //values: 01 00 3A 00 0F 00  //0x3A - Buckbaird,
+    //0x05E7C550, //+0x0A address,
+    //1: 01 00 08 00 05 00,
+    0x05E7C562,
+    //2: 01 00 08 00 05 00,
+    0x05E7C5E2,
+    //3: 01 00 08 00 05 00,
+    0x05E7C662,
+    //4: 01 00 08 00 05 00,
+    0x05E7C6E2,
+    //5: 01 00 08 00 05 00,
+    0x05E7C762,
+    //6: 01 00 3A 00 05 00,
+    0x05E7C7E2
+};
+
+int enemy_room_26[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x05FD7104, 0x05FD7108,
+    0x02,
+    //room spawners:,
+    0x05FD7132,
+    //values: 01 00 03 00 0F 00  //0x03 - Red Skeleton,
+    //0x05FD713C, //+0x0A address,
+    //room spawners:,
+    0x05FD7146,
+    //values: 01 00 08 00 0F 00  //0x08 - Bat,
+    //0x05FD7150, //+0x0A address,
+    //1: 01 00 03 00 05 00,
+    0x05FD7162,
+    //2: 01 00 08 00 05 00,
+    0x05FD71E2,
+    //3: 01 00 08 00 05 00,
+    0x05FD7262,
+    //4: 01 00 08 00 05 00,
+    0x05FD72E2,
+    //5: 01 00 08 00 05 00,
+    0x05FD7362,
+    //6: 01 00 08 00 05 00,
+    0x05FD73E2
+};
+
+int enemy_room_27[] = {
+    //num enemy types: 3, num enemies 6,
+    //0x06131404, 0x06131408,
+    0x03,
+    //room spawners:,
+    0x06131432,
+    //values: 01 00 30 00 0F 00  //0x30 - Skeleton Hunter,
+    //0x0613143C, //+0x0A address,
+    //room spawners:,
+    0x06131446,
+    //values: 01 00 03 00 0F 00  //0x03 - Red Skeleton,
+    //0x06131450, //+0x0A address,
+    //room spawners:,
+    0x0613145A,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x06131464, //+0x0A address,
+    //1: 01 00 30 00 05 00,
+    0x06131472,
+    //2: 01 00 03 00 05 00,
+    0x061314F2,
+    //3: 01 00 03 00 05 00,
+    0x06131572,
+    //4: 01 00 30 00 05 00,
+    0x061315F2,
+    //5: 01 00 30 00 05 00,
+    0x06131672,
+    //6: 01 00 4B 00 06 00,
+    0x061316F2
+};
+
+int enemy_room_28[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x063C5584, 0x063C5588,
+    0x01,
+    //room spawners:,
+    0x063C55B2,
+    //values: 01 00 11 00 0F 00  //0x11 - Skeleton Swordsman,
+    //0x063C55BC, //+0x0A address,
+    //1: 01 00 11 00 05 00,
+    0x063C55D2,
+    //2: 01 00 11 00 05 00,
+    0x063C5652
+};
+
+int enemy_room_29[] = {
+    //num enemy types: 1, num enemies 11,
+    //0x06565D84, 0x06565D88,
+    0x01,
+    //room spawners:,
+    0x06565DB2,
+    //values: 01 00 62 00 0F 00  //0x62 - Flea Man,
+    //0x06565DBC, //+0x0A address,
+    //1: 01 00 62 00 07 00,
+    0x06565DD2,
+    //2: 01 00 62 00 07 00,
+    0x06565E52,
+    //3: 01 00 62 00 07 00,
+    0x06565ED2,
+    //4: 01 00 62 00 07 00,
+    0x06565F52,
+    //5: 01 00 62 00 07 00,
+    0x06565FD2,
+    //6: 01 00 62 00 07 00,
+    0x06566052,
+    //7: 01 00 62 00 07 00,
+    0x065660D2,
+    //8: 01 00 62 00 07 00,
+    0x06566152,
+    //9: 01 00 62 00 07 00,
+    0x065661D2,
+    //10: 01 00 62 00 07 00,
+    0x06566252,
+    //11: 01 00 62 00 16 00,
+    0x065662D2
+};
+
+int enemy_room_30[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x06704D04, 0x06704D08,
+    0x01,
+    //room spawners:,
+    0x06704D32,
+    //values: 01 00 3A 00 02 00  //0x3A - Buckbaird,
+    //0x06704D3C, //+0x0A address,
+    //1: 01 00 3A 00 14 00,
+    0x06704D52
+};
+
+int enemy_room_31[] = {
+    //num enemy types: 3, num enemies 7,
+    //0x068FB884, 0x068FB888,
+    0x03,
+    //room spawners:,
+    0x068FB8B2,
+    //values: 01 00 19 00 02 00  //0x19 - Mist,
+    //0x068FB8BC, //+0x0A address,
+    //room spawners:,
+    0x068FB8C6,
+    //values: 01 00 17 00 0F 00  //0x17 - Skeleton Archer,
+    //0x068FB8D0, //+0x0A address,
+    //room spawners:,
+    0x068FB8DA,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x068FB8E4, //+0x0A address,
+    //1: 01 00 19 00 05 00,
+    0x068FB8F2,
+    //2: 01 00 17 00 07 00,
+    0x068FB972,
+    //3: 01 00 17 00 07 00,
+    0x068FB9F2,
+    //4: 01 00 17 00 07 00,
+    0x068FBA72,
+    //5: 01 00 17 00 05 00,
+    0x068FBAF2,
+    //6: 01 00 17 00 05 00,
+    0x068FBB72,
+    //7: 01 00 4B 00 06 00,
+    0x068FBBF2
+};
+
+int enemy_room_32[] = {
+    //num enemy types: 2, num enemies 3,
+    //0x06A53804, 0x06A53808,
+    0x02,
+    //room spawners:,
+    0x06A53832,
+    //values: 01 00 0C 00 0F 00  //0x0C - Skeleton,
+    //0x06A5383C, //+0x0A address,
+    //room spawners:,
+    0x06A53846,
+    //values: 01 00 58 00 02 00  //0x58 - Executioner,
+    //0x06A53850, //+0x0A address,
+    //1: 01 00 0C 00 04 00,
+    0x06A53862,
+    //2: 01 00 0C 00 04 00,
+    0x06A538E2,
+    //3: 01 00 58 00 05 00,
+    0x06A53962
+};
+
+int enemy_room_33[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x06B95E84, 0x06B95E88,
+    0x02,
+    //room spawners:,
+    0x06B95EB2,
+    //values: 01 00 58 00 02 00  //0x58 - Executioner,
+    //0x06B95EBC, //+0x0A address,
+    //room spawners:,
+    0x06B95EC6,
+    //values: 01 00 0C 00 0F 00  //0x0C - Skeleton,
+    //0x06B95ED0, //+0x0A address,
+    //1: 01 00 0C 00 05 00,
+    0x06B95EE2,
+    //2: 01 00 0C 00 05 00,
+    0x06B95F62,
+    //3: 01 00 0C 00 05 00,
+    0x06B95FE2,
+    //4: 01 00 0C 00 05 00,
+    0x06B96062,
+    //5: 01 00 58 00 04 00,
+    0x06B960E2
+};
+
+int enemy_room_34[] = {
+    //num enemy types: 1, num enemies 6,
+    //0x06D08804, 0x06D08808,
+    0x01,
+    //room spawners:,
+    0x06D08832,
+    //values: 01 00 30 00 02 00  //0x30 - Skeleton Hunter,
+    //0x06D0883C, //+0x0A address,
+    //1: 01 00 30 00 04 00,
+    0x06D08852,
+    //2: 01 00 30 00 04 00,
+    0x06D088D2,
+    //3: 01 00 30 00 04 00,
+    0x06D08952,
+    //4: 01 00 30 00 04 00,
+    0x06D089D2,
+    //5: 01 00 30 00 04 00,
+    0x06D08A52,
+    //6: 01 00 30 00 04 00,
+    0x06D08AD2
+};
+
+int enemy_room_35[] = {
+    //num enemy types: 1, num enemies 3,
+    //0x06ED5A84, 0x06ED5A88,
+    0x01,
+    //room spawners:,
+    0x06ED5AB2,
+    //values: 01 00 09 00 0F 00  //0x09 - Evil Sword,
+    //0x06ED5ABC, //+0x0A address,
+    //1: 01 00 09 00 05 00,
+    0x06ED5AD2,
+    //2: 01 00 09 00 05 00,
+    0x06ED5B52,
+    //3: 01 00 09 00 05 00,
+    0x06ED5BD2
+};
+
+int enemy_room_36[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x07256A84, 0x07256A88,
+    0x02,
+    //room spawners:,
+    0x07256AB2,
+    //values: 01 00 67 00 02 00  //0x67 - Spartacus,
+    //0x07256ABC, //+0x0A address,
+    //room spawners:,
+    0x07256AC6,
+    //values: 01 00 30 00 02 00  //0x30 - Skeleton Hunter,
+    //0x07256AD0, //+0x0A address,
+    //1: 01 00 67 00 04 00,
+    0x07256AE2,
+    //2: 01 00 67 00 04 00,
+    0x07256B62,
+    //3: 01 00 30 00 04 00,
+    0x07256BE2,
+    //4: 01 00 67 00 04 00,
+    0x07256C62,
+    //5: 01 00 30 00 04 00,
+    0x07256CE2,
+    //6: 01 00 67 00 04 00,
+    0x07256D62
+};
+
+int enemy_room_37[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x07426004, 0x07426008,
+    0x02,
+    //room spawners:,
+    0x07426032,
+    //values: 01 00 03 00 02 00  //0x03 - Red Skeleton,
+    //0x0742603C, //+0x0A address,
+    //room spawners:,
+    0x07426046,
+    //values: 01 00 22 00 02 00  //0x22 - Astral Fighter,
+    //0x07426050, //+0x0A address,
+    //1: 01 00 22 00 04 00,
+    0x07426062,
+    //2: 01 00 22 00 04 00,
+    0x074260E2,
+    //3: 01 00 22 00 04 00,
+    0x07426162,
+    //4: 01 00 03 00 04 00,
+    0x074261E2,
+    //5: 01 00 03 00 04 00,
+    0x07426262,
+    //6: 01 00 03 00 04 00,
+    0x074262E2
+};
+
+int enemy_room_38[] = {
+    //num enemy types: 3, num enemies 7,
+    //0x07564404, 0x07564408,
+    0x03,
+    //room spawners:,
+    0x07564432,
+    //values: 01 00 07 00 02 00  //0x07 - Zombie,
+    //0x0756443C, //+0x0A address,
+    //room spawners:,
+    0x07564446,
+    //values: 01 00 65 00 02 00  //0x65 - Hanged Man,
+    //0x07564450, //+0x0A address,
+    //room spawners:,
+    0x0756445A,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x07564464, //+0x0A address,
+    //1: 01 00 07 00 05 00,
+    0x07564472,
+    //2: 01 00 07 00 05 00,
+    0x075644F2,
+    //3: 01 00 07 00 05 00,
+    0x07564572,
+    //4: 01 00 65 00 05 00,
+    0x075645F2,
+    //5: 01 00 65 00 05 00,
+    0x07564672,
+    //6: 01 00 65 00 05 00,
+    0x075646F2,
+    //7: 01 00 4B 00 06 00,
+    0x07564772
+};
+
+int enemy_room_39[] = {
+    //num enemy types: 3, num enemies 7,
+    //0x076AB284, 0x076AB288,
+    0x03,
+    //room spawners:,
+    0x076AB2B2,
+    //values: 01 00 65 00 02 00  //0x65 - Hanged Man,
+    //0x076AB2BC, //+0x0A address,
+    //room spawners:,
+    0x076AB2C6,
+    //values: 01 00 07 00 02 00  //0x07 - Zombie,
+    //0x076AB2D0, //+0x0A address,
+    //room spawners:,
+    0x076AB2DA,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x076AB2E4, //+0x0A address,
+    //1: 01 00 07 00 05 00,
+    0x076AB2F2,
+    //2: 01 00 07 00 07 00,
+    0x076AB372,
+    //3: 01 00 07 00 05 00,
+    0x076AB3F2,
+    //4: 01 00 65 00 05 00,
+    0x076AB472,
+    //5: 01 00 65 00 05 00,
+    0x076AB4F2,
+    //6: 01 00 65 00 05 00,
+    0x076AB572,
+    //7: 01 00 4B 00 06 00,
+    0x076AB5F2
+};
+
+int enemy_room_40[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x077F3484, 0x077F3488,
+    0x02,
+    //room spawners:,
+    0x077F34B2,
+    //values: 01 00 65 00 02 00  //0x65 - Hanged Man,
+    //0x077F34BC, //+0x0A address,
+    //room spawners:,
+    0x077F34C6,
+    //values: 01 00 1E 00 02 00  //0x1E - Ghost Warrior,
+    //0x077F34D0, //+0x0A address,
+    //1: 01 00 1E 00 05 00,
+    0x077F34E2,
+    //2: 01 00 1E 00 05 00,
+    0x077F3562,
+    //3: 01 00 1E 00 05 00,
+    0x077F35E2,
+    //4: 01 00 65 00 05 00,
+    0x077F3662,
+    //5: 01 00 65 00 05 00,
+    0x077F36E2,
+    //6: 01 00 65 00 05 00,
+    0x077F3762
+};
+
+int enemy_room_41[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x07943104, 0x07943108,
+    0x02,
+    //room spawners:,
+    0x07943132,
+    //values: 01 00 28 00 02 00  //0x28 - Rune Spirit,
+    //0x0794313C, //+0x0A address,
+    //room spawners:,
+    0x07943146,
+    //values: 01 00 65 00 02 00  //0x65 - Hanged Man,
+    //0x07943150, //+0x0A address,
+    //1: 01 00 28 00 05 00,
+    0x07943162,
+    //2: 01 00 28 00 05 00,
+    0x079431E2,
+    //3: 01 00 28 00 05 00,
+    0x07943262,
+    //4: 01 00 65 00 05 00,
+    0x079432E2,
+    //5: 01 00 65 00 05 00,
+    0x07943362,
+    //6: 01 00 65 00 05 00,
+    0x079433E2
+};
+
+int enemy_room_42[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x07A9CC04, 0x07A9CC08,
+    0x02,
+    //room spawners:,
+    0x07A9CC32,
+    //values: 01 00 07 00 02 00  //0x07 - Zombie,
+    //0x07A9CC3C, //+0x0A address,
+    //room spawners:,
+    0x07A9CC46,
+    //values: 01 00 3A 00 02 00  //0x3A - Buckbaird,
+    //0x07A9CC50, //+0x0A address,
+    //1: 01 00 07 00 05 00,
+    0x07A9CC62,
+    //2: 01 00 07 00 05 00,
+    0x07A9CCE2,
+    //3: 01 00 07 00 05 00,
+    0x07A9CD62,
+    //4: 01 00 3A 00 05 00,
+    0x07A9CDE2,
+    //5: 01 00 3A 00 05 00,
+    0x07A9CE62
+};
+
+int enemy_room_43[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x07BF3104, 0x07BF3108,
+    0x02,
+    //room spawners:,
+    0x07BF3132,
+    //values: 01 00 2A 00 02 00  //0x2A - Vassago,
+    //0x07BF313C, //+0x0A address,
+    //room spawners:,
+    0x07BF3146,
+    //values: 01 00 65 00 02 00  //0x65 - Hanged Man,
+    //0x07BF3150, //+0x0A address,
+    //1: 01 00 2A 00 04 00,
+    0x07BF3162,
+    //2: 01 00 2A 00 04 00,
+    0x07BF31E2,
+    //3: 01 00 2A 00 04 00,
+    0x07BF3262,
+    //4: 01 00 65 00 04 00,
+    0x07BF32E2,
+    //5: 01 00 65 00 04 00,
+    0x07BF3362,
+    //6: 01 00 65 00 04 00,
+    0x07BF33E2
+};
+
+int enemy_room_44[] = {
+    //num enemy types: 3, num enemies 3,
+    //0x07D49B04, 0x07D49B08,
+    0x03,
+    //room spawners:,
+    0x07D49B32,
+    //values: 01 00 30 00 02 00  //0x30 - Skeleton Hunter,
+    //0x07D49B3C, //+0x0A address,
+    //room spawners:,
+    0x07D49B46,
+    //values: 01 00 08 00 02 00  //0x08 - Bat,
+    //0x07D49B50, //+0x0A address,
+    //room spawners:,
+    0x07D49B5A,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x07D49B64, //+0x0A address,
+    //1: 01 00 30 00 04 00,
+    0x07D49B72,
+    //2: 01 00 08 00 14 00,
+    0x07D49BF2,
+    //3: 01 00 4B 00 06 00,
+    0x07D49C72
+};
+
+int enemy_room_45[] = {
+    //num enemy types: 3, num enemies 4,
+    //0x07EB0284, 0x07EB0288,
+    0x03,
+    //room spawners:,
+    0x07EB02B2,
+    //values: 01 00 22 00 02 00  //0x22 - Astral Fighter,
+    //0x07EB02BC, //+0x0A address,
+    //room spawners:,
+    0x07EB02C6,
+    //values: 01 00 1A 00 0F 00  //0x1A - Heavy Armor,
+    //0x07EB02D0, //+0x0A address,
+    //room spawners:,
+    0x07EB02DA,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x07EB02E4, //+0x0A address,
+    //1: 01 00 22 00 04 00,
+    0x07EB02F2,
+    //2: 01 00 1A 00 04 00,
+    0x07EB0372,
+    //3: 01 00 22 00 04 00,
+    0x07EB03F2,
+    //4: 01 00 4B 00 06 00,
+    0x07EB0472
+};
+
+/*
+int enemy_room_46[] = {
+    //num enemy types: 3, num enemies 15,
+    //0x08016C84, 0x08016C88,
+    0x03,
+    //room spawners:,
+    0x08016CB2,
+    //values: 01 00 38 00 0F 00  //0x38 - Peeping Eye,
+    //0x08016CBC, //+0x0A address,
+    //room spawners:,
+    0x08016CC6,
+    //values: 01 00 54 00 0F 00  //0x54 - ???,
+    //0x08016CD0, //+0x0A address,
+    //room spawners:,
+    0x08016CDA,
+    //values: 01 00 0C 00 0F 00  //0x0C - Skeleton,
+    //0x08016CE4, //+0x0A address,
+    //1: 01 00 38 00 05 00,
+    0x08016CF2,
+    //2: 01 00 0C 00 07 00,
+    0x08016D72,
+    //3: 01 00 0C 00 07 00,
+    0x08016DF2,
+    //4: 01 00 0C 00 07 00,
+    0x08016E72,
+    //5: 01 00 0C 00 07 00,
+    0x08016EF2,
+    //6: 01 00 0C 00 07 00,
+    0x08016F72,
+    //7: 01 00 0C 00 07 00,
+    0x08016FF2,
+    //8: 01 00 0C 00 06 00,
+    0x08017072,
+    //9: 01 00 0C 00 06 00,
+    0x080170F2,
+    //10: 01 00 0C 00 06 00,
+    0x08017172,
+    //11: 01 00 0C 00 06 00,
+    0x080171F2,
+    //12: 01 00 0C 00 06 00,
+    0x08017272,
+    //13: 01 00 0C 00 06 00,
+    0x080172F2,
+    //14: 01 00 0C 00 06 00,
+    0x08017372,
+    //15: 01 00 54 00 06 00,
+    0x080173F2
+};
+*/
+
+int enemy_room_47[] = {
+    //num enemy types: 1, num enemies 3,
+    //0x083C3C84, 0x083C3C88,
+    0x01,
+    //room spawners:,
+    0x083C3CB2,
+    //values: 01 00 58 00 0F 00  //0x58 - Executioner,
+    //0x083C3CBC, //+0x0A address,
+    //1: 01 00 58 00 05 00,
+    0x083C3CD2,
+    //2: 01 00 58 00 05 00,
+    0x083C3D52,
+    //3: 01 00 58 00 05 00,
+    0x083C3DD2
+};
+
+int enemy_room_48[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x0852A484, 0x0852A488,
+    0x02,
+    //room spawners:,
+    0x0852A4B2,
+    //values: 01 00 17 00 02 00  //0x17 - Skeleton Archer,
+    //0x0852A4BC, //+0x0A address,
+    //room spawners:,
+    0x0852A4C6,
+    //values: 01 00 22 00 02 00  //0x22 - Astral Fighter,
+    //0x0852A4D0, //+0x0A address,
+    //1: 01 00 22 00 04 00,
+    0x0852A4E2,
+    //2: 01 00 22 00 04 00,
+    0x0852A562,
+    //3: 01 00 22 00 04 00,
+    0x0852A5E2,
+    //4: 01 00 17 00 04 00,
+    0x0852A662,
+    //5: 01 00 17 00 04 00,
+    0x0852A6E2,
+    //6: 01 00 17 00 04 00,
+    0x0852A762
+};
+
+int enemy_room_49[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x086CF504, 0x086CF508,
+    0x01,
+    //room spawners:,
+    0x086CF532,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x086CF53C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x086CF552
+};
+
+int enemy_room_50[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x08876984, 0x08876988,
+    0x01,
+    //room spawners:,
+    0x088769B2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x088769BC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x088769D2
+};
+
+int enemy_room_51[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x089FB184, 0x089FB188,
+    0x01,
+    //room spawners:,
+    0x089FB1B2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x089FB1BC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x089FB1D2,
+    //2: 01 00 54 00 04 00,
+    0x089FB252
+};
+
+int enemy_room_52[] = {
+    //num enemy types: 2, num enemies 4,
+    //0x08B57084, 0x08B57088,
+    0x02,
+    //room spawners:,
+    0x08B570B2,
+    //values: 01 00 2A 00 02 00  //0x2A - Vassago,
+    //0x08B570BC, //+0x0A address,
+    //room spawners:,
+    0x08B570C6,
+    //values: 01 00 61 00 0F 00  //0x61 - Wolf Skeleton,
+    //0x08B570D0, //+0x0A address,
+    //1: 01 00 61 00 04 00,
+    0x08B570E2,
+    //2: 01 00 61 00 04 00,
+    0x08B57162,
+    //3: 01 00 2A 00 04 00,
+    0x08B571E2,
+    //4: 01 00 2A 00 04 00,
+    0x08B57262
+};
+
+int enemy_room_53[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x08CFE304, 0x08CFE308,
+    0x01,
+    //room spawners:,
+    0x08CFE332,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x08CFE33C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x08CFE352,
+    //2: 01 00 54 00 04 00,
+    0x08CFE3D2
+};
+
+int enemy_room_54[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x08EA3584, 0x08EA3588,
+    0x01,
+    //room spawners:,
+    0x08EA35B2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x08EA35BC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x08EA35D2,
+    //2: 01 00 54 00 04 00,
+    0x08EA3652
+};
+
+int enemy_room_55[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x09085104, 0x09085108,
+    0x01,
+    //room spawners:,
+    0x09085132,
+    //values: 01 00 73 00 0F 00  //0x73 - ???,
+    //0x0908513C, //+0x0A address,
+    //1: 01 00 73 00 04 00,
+    0x09085152
+};
+
+int enemy_room_56[] = {
+    //num enemy types: 3, num enemies 4,
+    //0x091E3384, 0x091E3388,
+    0x03,
+    //room spawners:,
+    0x091E33B2,
+    //values: 01 00 41 00 0F 00  //0x41 - ???,
+    //0x091E33BC, //+0x0A address,
+    //room spawners:,
+    0x091E33C6,
+    //values: 01 00 0A 00 02 00  //0x0A - Axe Armor,
+    //0x091E33D0, //+0x0A address,
+    //room spawners:,
+    0x091E33DA,
+    //values: 01 00 0C 00 0F 00  //0x0C - Skeleton,
+    //0x091E33E4, //+0x0A address,
+    //1: 01 00 41 00 06 00,
+    0x091E33F2,
+    //2: 01 00 0C 00 04 00,
+    0x091E3472,
+    //3: 01 00 0C 00 04 00,
+    0x091E34F2,
+    //4: 01 00 0A 00 04 00,
+    0x091E3572
+};
+
+int enemy_room_57[] = {
+    //num enemy types: 3, num enemies 4,
+    //0x09349784, 0x09349788,
+    0x03,
+    //room spawners:,
+    0x093497B2,
+    //values: 01 00 1F 00 0F 00  //0x1F - Ghost Knight,
+    //0x093497BC, //+0x0A address,
+    //room spawners:,
+    0x093497C6,
+    //values: 01 00 23 00 02 00  //0x23 - Astral Warrior,
+    //0x093497D0, //+0x0A address,
+    //room spawners:,
+    0x093497DA,
+    //values: 01 00 11 00 0D 00  //0x11 - Skeleton Swordsman,
+    //0x093497E4, //+0x0A address,
+    //1: 01 00 1F 00 14 00,
+    0x093497F2,
+    //2: 01 00 11 00 14 00,
+    0x09349872,
+    //3: 01 00 23 00 04 00,
+    0x093498F2,
+    //4: 01 00 23 00 04 00,
+    0x09349972
+};
+
+int enemy_room_58[] = {
+    //num enemy types: 3, num enemies 6,
+    //0x0956D804, 0x0956D808,
+    0x03,
+    //room spawners:,
+    0x0956D832,
+    //values: 01 00 66 00 0D 00  //0x66 - Frost Zombie,
+    //0x0956D83C, //+0x0A address,
+    //room spawners:,
+    0x0956D846,
+    //values: 01 00 67 00 02 00  //0x67 - Spartacus,
+    //0x0956D850, //+0x0A address,
+    //room spawners:,
+    0x0956D85A,
+    //values: 01 00 11 00 0F 00  //0x11 - Skeleton Swordsman,
+    //0x0956D864, //+0x0A address,
+    //1: 01 00 66 00 14 00,
+    0x0956D872,
+    //2: 01 00 11 00 14 00,
+    0x0956D8F2,
+    //3: 01 00 67 00 04 00,
+    0x0956D972,
+    //4: 01 00 67 00 04 00,
+    0x0956D9F2,
+    //5: 01 00 67 00 04 00,
+    0x0956DA72,
+    //6: 01 00 67 00 04 00,
+    0x0956DAF2
+};
+
+int enemy_room_59[] = {
+    //num enemy types: 3, num enemies 4,
+    //0x0979BD84, 0x0979BD88,
+    0x03,
+    //room spawners:,
+    0x0979BDB2,
+    //values: 01 00 0A 00 0F 00  //0x0A - Axe Armor,
+    //0x0979BDBC, //+0x0A address,
+    //room spawners:,
+    0x0979BDC6,
+    //values: 01 00 04 00 02 00  //0x04 - Mad Diver,
+    //0x0979BDD0, //+0x0A address,
+    //room spawners:,
+    0x0979BDDA,
+    //values: 01 00 11 00 0D 00  //0x11 - Skeleton Swordsman,
+    //0x0979BDE4, //+0x0A address,
+    //1: 01 00 0A 00 04 00,
+    0x0979BDF2,
+    //2: 01 00 11 00 14 00,
+    0x0979BE72,
+    //3: 01 00 0A 00 04 00,
+    0x0979BEF2,
+    //4: 01 00 04 00 14 00,
+    0x0979BF72
+};
+
+int enemy_room_60[] = {
+    //num enemy types: 3, num enemies 4,
+    //0x09908384, 0x09908388,
+    0x03,
+    //room spawners:,
+    0x099083B2,
+    //values: 01 00 38 00 0F 00  //0x38 - Peeping Eye,
+    //0x099083BC, //+0x0A address,
+    //room spawners:,
+    0x099083C6,
+    //values: 01 00 23 00 0F 00  //0x23 - Astral Warrior,
+    //0x099083D0, //+0x0A address,
+    //room spawners:,
+    0x099083DA,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x099083E4, //+0x0A address,
+    //1: 01 00 38 00 04 00,
+    0x099083F2,
+    //2: 01 00 38 00 04 00,
+    0x09908472,
+    //3: 01 00 23 00 04 00,
+    0x099084F2,
+    //4: 01 00 54 00 04 00,
+    0x09908572
+};
+
+int enemy_room_61[] = {
+    //num enemy types: 3, num enemies 4,
+    //0x09A6A784, 0x09A6A788,
+    0x03,
+    //room spawners:,
+    0x09A6A7B2,
+    //values: 01 00 20 00 0F 00  //0x20 - Axe Knight,
+    //0x09A6A7BC, //+0x0A address,
+    //room spawners:,
+    0x09A6A7C6,
+    //values: 01 00 03 00 0F 00  //0x03 - Red Skeleton,
+    //0x09A6A7D0, //+0x0A address,
+    //room spawners:,
+    0x09A6A7DA,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x09A6A7E4, //+0x0A address,
+    //1: 01 00 20 00 04 00,
+    0x09A6A7F2,
+    //2: 01 00 03 00 04 00,
+    0x09A6A872,
+    //3: 01 00 03 00 04 00,
+    0x09A6A8F2,
+    //4: 01 00 54 00 04 00,
+    0x09A6A972
+};
+
+int enemy_room_62[] = {
+    //num enemy types: 2, num enemies 3,
+    //0x09BD8E84, 0x09BD8E88,
+    0x02,
+    //room spawners:,
+    0x09BD8EB2,
+    //values: 01 00 6A 00 02 00  //0x6A - Flame Demon,
+    //0x09BD8EBC, //+0x0A address,
+    //room spawners:,
+    0x09BD8EC6,
+    //values: 01 00 1F 00 02 00  //0x1F - Ghost Knight,
+    //0x09BD8ED0, //+0x0A address,
+    //1: 01 00 6A 00 04 00,
+    0x09BD8EE2,
+    //2: 01 00 6A 00 04 00,
+    0x09BD8F62,
+    //3: 01 00 1F 00 14 00,
+    0x09BD8FE2
+};
+
+int enemy_room_63[] = {
+    //num enemy types: 3, num enemies 3,
+    //0x09D38D84, 0x09D38D88,
+    0x03,
+    //room spawners:,
+    0x09D38DB2,
+    //values: 01 00 04 00 0F 00  //0x04 - Mad Diver,
+    //0x09D38DBC, //+0x0A address,
+    //room spawners:,
+    0x09D38DC6,
+    //values: 01 00 25 00 0F 00  //0x25 - Flame Zombie,
+    //0x09D38DD0, //+0x0A address,
+    //room spawners:,
+    0x09D38DDA,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x09D38DE4, //+0x0A address,
+    //1: 01 00 04 00 04 00,
+    0x09D38DF2,
+    //2: 01 00 25 00 14 00,
+    0x09D38E72,
+    //3: 01 00 54 00 04 00,
+    0x09D38EF2
+};
+
+int enemy_room_64[] = {
+    //num enemy types: 3, num enemies 4,
+    //0x09F5E484, 0x09F5E488,
+    0x03,
+    //room spawners:,
+    0x09F5E4B2,
+    //values: 01 00 0A 00 0F 00  //0x0A - Axe Armor,
+    //0x09F5E4BC, //+0x0A address,
+    //room spawners:,
+    0x09F5E4C6,
+    //values: 01 00 35 00 02 00  //0x35 - Evil Stabber,
+    //0x09F5E4D0, //+0x0A address,
+    //room spawners:,
+    0x09F5E4DA,
+    //values: 01 00 1F 00 0D 00  //0x1F - Ghost Knight,
+    //0x09F5E4E4, //+0x0A address,
+    //1: 01 00 0A 00 04 00,
+    0x09F5E4F2,
+    //2: 01 00 0A 00 04 00,
+    0x09F5E572,
+    //3: 01 00 1F 00 14 00,
+    0x09F5E5F2,
+    //4: 01 00 35 00 14 00,
+    0x09F5E672
+};
+
+int enemy_room_65[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x0A0C6B04, 0x0A0C6B08,
+    0x01,
+    //room spawners:,
+    0x0A0C6B32,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0A0C6B3C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x0A0C6B52,
+    //2: 01 00 54 00 04 00,
+    0x0A0C6BD2
+};
+
+int enemy_room_66[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x0A2FCC04, 0x0A2FCC08,
+    0x02,
+    //room spawners:,
+    0x0A2FCC32,
+    //values: 01 00 66 00 0F 00  //0x66 - Frost Zombie,
+    //0x0A2FCC3C, //+0x0A address,
+    //room spawners:,
+    0x0A2FCC46,
+    //values: 01 00 25 00 0F 00  //0x25 - Flame Zombie,
+    //0x0A2FCC50, //+0x0A address,
+    //1: 01 00 66 00 14 00,
+    0x0A2FCC62,
+    //2: 01 00 25 00 14 00,
+    0x0A2FCCE2,
+    //3: 01 00 66 00 04 00,
+    0x0A2FCD62,
+    //4: 01 00 66 00 04 00,
+    0x0A2FCDE2,
+    //5: 01 00 25 00 04 00,
+    0x0A2FCE62,
+    //6: 01 00 25 00 04 00,
+    0x0A2FCEE2
+};
+
+int enemy_room_67[] = {
+    //num enemy types: 3, num enemies 6,
+    //0x0A487604, 0x0A487608,
+    0x03,
+    //room spawners:,
+    0x0A487632,
+    //values: 01 00 1F 00 0D 00  //0x1F - Ghost Knight,
+    //0x0A48763C, //+0x0A address,
+    //room spawners:,
+    0x0A487646,
+    //values: 01 00 65 00 02 00  //0x65 - Hanged Man,
+    //0x0A487650, //+0x0A address,
+    //room spawners:,
+    0x0A48765A,
+    //values: 01 00 25 00 0F 00  //0x25 - Flame Zombie,
+    //0x0A487664, //+0x0A address,
+    //1: 01 00 1F 00 14 00,
+    0x0A487672,
+    //2: 01 00 25 00 14 00,
+    0x0A4876F2,
+    //3: 01 00 65 00 04 00,
+    0x0A487772,
+    //4: 01 00 65 00 04 00,
+    0x0A4877F2,
+    //5: 01 00 65 00 04 00,
+    0x0A487872,
+    //6: 01 00 65 00 04 00,
+    0x0A4878F2
+};
+
+int enemy_room_68[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x0A5F5984, 0x0A5F5988,
+    0x02,
+    //room spawners:,
+    0x0A5F59B2,
+    //values: 01 00 15 00 0F 00  //0x15 - Armor Knight,
+    //0x0A5F59BC, //+0x0A address,
+    //room spawners:,
+    0x0A5F59C6,
+    //values: 01 00 4E 00 0F 00  //0x4E - Hellhound,
+    //0x0A5F59D0, //+0x0A address,
+    //1: 01 00 15 00 04 00,
+    0x0A5F59E2,
+    //2: 01 00 4E 00 04 00,
+    0x0A5F5A62,
+    //3: 01 00 4E 00 04 00,
+    0x0A5F5AE2,
+    //4: 01 00 15 00 04 00,
+    0x0A5F5B62,
+    //5: 01 00 15 00 04 00,
+    0x0A5F5BE2
+};
+
+int enemy_room_69[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x0A77A384, 0x0A77A388,
+    0x01,
+    //room spawners:,
+    0x0A77A3B2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0A77A3BC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x0A77A3D2,
+    //2: 01 00 54 00 04 00,
+    0x0A77A452
+};
+
+int enemy_room_70[] = {
+    //num enemy types: 4, num enemies 12,
+    //0x0A97B904, 0x0A97B908,
+    0x04,
+    //room spawners:,
+    0x0A97B932,
+    //values: 01 00 1C 00 0F 00  //0x1C - Golem,
+    //0x0A97B93C, //+0x0A address,
+    //room spawners:,
+    0x0A97B946,
+    //values: 01 00 72 00 0F 00  //0x72 - ???,
+    //0x0A97B950, //+0x0A address,
+    //room spawners:,
+    0x0A97B95A,
+    //values: 01 00 73 00 0F 00  //0x73 - ???,
+    //0x0A97B964, //+0x0A address,
+    //room spawners:,
+    0x0A97B96E,
+    //values: 01 00 74 00 0F 00  //0x74 - ???,
+    //0x0A97B978, //+0x0A address,
+    //1: 01 00 1C 00 06 00,
+    0x0A97B982,
+    //2: 01 00 74 00 06 00,
+    0x0A97BA02,
+    //3: 01 00 73 00 06 00,
+    0x0A97BA82,
+    //4: 01 00 72 00 06 00,
+    0x0A97BB02,
+    //5: 01 00 73 00 06 00,
+    0x0A97BB82,
+    //6: 01 00 72 00 06 00,
+    0x0A97BC02,
+    //7: 01 00 72 00 06 00,
+    0x0A97BC82,
+    //8: 01 00 72 00 06 00,
+    0x0A97BD02,
+    //9: 01 00 72 00 06 00,
+    0x0A97BD82,
+    //10: 01 00 72 00 06 00,
+    0x0A97BE02,
+    //11: 01 00 72 00 06 00,
+    0x0A97BE82,
+    //12: 01 00 1C 00 06 00,
+    0x0A97BF02
+};
+
+int enemy_room_71[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x0AB0E904, 0x0AB0E908,
+    0x01,
+    //room spawners:,
+    0x0AB0E932,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0AB0E93C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x0AB0E952,
+    //2: 01 00 54 00 04 00,
+    0x0AB0E9D2
+};
+
+int enemy_room_72[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x0AC7A784, 0x0AC7A788,
+    0x01,
+    //room spawners:,
+    0x0AC7A7B2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0AC7A7BC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x0AC7A7D2,
+    //2: 01 00 54 00 04 00,
+    0x0AC7A852
+};
+
+int enemy_room_73[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x0ADDC484, 0x0ADDC488,
+    0x02,
+    //room spawners:,
+    0x0ADDC4B2,
+    //values: 01 00 23 00 0F 00  //0x23 - Astral Warrior,
+    //0x0ADDC4BC, //+0x0A address,
+    //room spawners:,
+    0x0ADDC4C6,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0ADDC4D0, //+0x0A address,
+    //1: 01 00 23 00 05 00,
+    0x0ADDC4E2,
+    //2: 01 00 23 00 05 00,
+    0x0ADDC562,
+    //3: 01 00 23 00 05 00,
+    0x0ADDC5E2,
+    //4: 01 00 23 00 05 00,
+    0x0ADDC662,
+    //5: 01 00 54 00 04 00,
+    0x0ADDC6E2
+};
+
+int enemy_room_74[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x0AF3EC84, 0x0AF3EC88,
+    0x01,
+    //room spawners:,
+    0x0AF3ECB2,
+    //values: 01 00 62 00 02 00  //0x62 - Flea Man,
+    //0x0AF3ECBC, //+0x0A address,
+    //1: 01 00 62 00 14 00,
+    0x0AF3ECD2
+};
+
+int enemy_room_75[] = {
+    //num enemy types: 2, num enemies 2,
+    //0x0B09D484, 0x0B09D488,
+    0x02,
+    //room spawners:,
+    0x0B09D4B2,
+    //values: 01 00 65 00 0F 00  //0x65 - Hanged Man,
+    //0x0B09D4BC, //+0x0A address,
+    //room spawners:,
+    0x0B09D4C6,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0B09D4D0, //+0x0A address,
+    //1: 01 00 65 00 14 00,
+    0x0B09D4E2,
+    //2: 01 00 54 00 04 00,
+    0x0B09D562
+};
+
+int enemy_room_76[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x0B240204, 0x0B240208,
+    0x02,
+    //room spawners:,
+    0x0B240232,
+    //values: 01 00 14 00 0F 00  //0x14 - Skeleton Flower,
+    //0x0B24023C, //+0x0A address,
+    //room spawners:,
+    0x0B240246,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0B240250, //+0x0A address,
+    //1: 01 00 14 00 04 00,
+    0x0B240262,
+    //2: 01 00 14 00 04 00,
+    0x0B2402E2,
+    //3: 01 00 54 00 04 00,
+    0x0B240362,
+    //4: 01 00 54 00 04 00,
+    0x0B2403E2,
+    //5: 01 00 54 00 04 00,
+    0x0B240462
+};
+
+int enemy_room_77[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x0B3E7E84, 0x0B3E7E88,
+    0x01,
+    //room spawners:,
+    0x0B3E7EB2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0B3E7EBC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x0B3E7ED2,
+    //2: 01 00 54 00 04 00,
+    0x0B3E7F52
+};
+
+int enemy_room_78[] = {
+    //num enemy types: 4, num enemies 11,
+    //0x0B59E884, 0x0B59E888,
+    0x04,
+    //room spawners:,
+    0x0B59E8B2,
+    //values: 01 00 64 00 0F 00  //0x64 - Flame Elemental,
+    //0x0B59E8BC, //+0x0A address,
+    //room spawners:,
+    0x0B59E8C6,
+    //values: 01 00 73 00 0F 00  //0x73 - ???,
+    //0x0B59E8D0, //+0x0A address,
+    //room spawners:,
+    0x0B59E8DA,
+    //values: 01 00 72 00 0F 00  //0x72 - ???,
+    //0x0B59E8E4, //+0x0A address,
+    //room spawners:,
+    0x0B59E8EE,
+    //values: 01 00 74 00 0F 00  //0x74 - ???,
+    //0x0B59E8F8, //+0x0A address,
+    //1: 01 00 64 00 06 00,
+    0x0B59E902,
+    //2: 01 00 74 00 06 00,
+    0x0B59E982,
+    //3: 01 00 72 00 06 00,
+    0x0B59EA02,
+    //4: 01 00 73 00 06 00,
+    0x0B59EA82,
+    //5: 01 00 72 00 06 00,
+    0x0B59EB02,
+    //6: 01 00 72 00 06 00,
+    0x0B59EB82,
+    //7: 01 00 64 00 06 00,
+    0x0B59EC02,
+    //8: 01 00 72 00 06 00,
+    0x0B59EC82,
+    //9: 01 00 72 00 06 00,
+    0x0B59ED02,
+    //10: 01 00 72 00 06 00,
+    0x0B59ED82,
+    //11: 01 00 72 00 06 00,
+    0x0B59EE02
+};
+
+int enemy_room_79[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x0B701904, 0x0B701908,
+    0x02,
+    //room spawners:,
+    0x0B701932,
+    //values: 01 00 57 00 0F 00  //0x57 - Red Ogre,
+    //0x0B70193C, //+0x0A address,
+    //room spawners:,
+    0x0B701946,
+    //values: 01 00 03 00 0F 00  //0x03 - Red Skeleton,
+    //0x0B701950, //+0x0A address,
+    //1: 01 00 57 00 04 00,
+    0x0B701962,
+    //2: 01 00 03 00 04 00,
+    0x0B7019E2,
+    //3: 01 00 03 00 04 00,
+    0x0B701A62,
+    //4: 01 00 03 00 04 00,
+    0x0B701AE2,
+    //5: 01 00 03 00 04 00,
+    0x0B701B62
+};
+
+int enemy_room_80[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x0B9E9C04, 0x0B9E9C08,
+    0x01,
+    //room spawners:,
+    0x0B9E9C32,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0B9E9C3C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x0B9E9C52,
+    //2: 01 00 54 00 04 00,
+    0x0B9E9CD2
+};
+
+int enemy_room_81[] = {
+    //num enemy types: 3, num enemies 5,
+    //0x0BBD2E04, 0x0BBD2E08,
+    0x03,
+    //room spawners:,
+    0x0BBD2E32,
+    //values: 01 00 30 00 02 00  //0x30 - Skeleton Hunter,
+    //0x0BBD2E3C, //+0x0A address,
+    //room spawners:,
+    0x0BBD2E46,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x0BBD2E50, //+0x0A address,
+    //room spawners:,
+    0x0BBD2E5A,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0BBD2E64, //+0x0A address,
+    //1: 01 00 30 00 07 00,
+    0x0BBD2E72,
+    //2: 01 00 30 00 07 00,
+    0x0BBD2EF2,
+    //3: 01 00 30 00 07 00,
+    0x0BBD2F72,
+    //4: 01 00 4B 00 06 00,
+    0x0BBD2FF2,
+    //5: 01 00 54 00 04 00,
+    0x0BBD3072
+};
+
+int enemy_room_82[] = {
+    //num enemy types: 3, num enemies 5,
+    //0x0BD97804, 0x0BD97808,
+    0x03,
+    //room spawners:,
+    0x0BD97832,
+    //values: 01 00 6A 00 0F 00  //0x6A - Flame Demon,
+    //0x0BD9783C, //+0x0A address,
+    //room spawners:,
+    0x0BD97846,
+    //values: 01 00 03 00 0F 00  //0x03 - Red Skeleton,
+    //0x0BD97850, //+0x0A address,
+    //room spawners:,
+    0x0BD9785A,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0BD97864, //+0x0A address,
+    //1: 01 00 6A 00 04 00,
+    0x0BD97872,
+    //2: 01 00 03 00 04 00,
+    0x0BD978F2,
+    //3: 01 00 03 00 04 00,
+    0x0BD97972,
+    //4: 01 00 03 00 04 00,
+    0x0BD979F2,
+    //5: 01 00 54 00 04 00,
+    0x0BD97A72
+};
+
+int enemy_room_83[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x0BEFB184, 0x0BEFB188,
+    0x02,
+    //room spawners:,
+    0x0BEFB1B2,
+    //values: 01 00 4E 00 0F 00  //0x4E - Hellhound,
+    //0x0BEFB1BC, //+0x0A address,
+    //room spawners:,
+    0x0BEFB1C6,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0BEFB1D0, //+0x0A address,
+    //1: 01 00 4E 00 04 00,
+    0x0BEFB1E2,
+    //2: 01 00 4E 00 04 00,
+    0x0BEFB262,
+    //3: 01 00 4E 00 04 00,
+    0x0BEFB2E2,
+    //4: 01 00 4E 00 04 00,
+    0x0BEFB362,
+    //5: 01 00 54 00 04 00,
+    0x0BEFB3E2
+};
+
+int enemy_room_84[] = {
+    //num enemy types: 4, num enemies 5,
+    //0x0C05CF84, 0x0C05CF88,
+    0x04,
+    //room spawners:,
+    0x0C05CFB2,
+    //values: 01 00 20 00 0F 00  //0x20 - Axe Knight,
+    //0x0C05CFBC, //+0x0A address,
+    //room spawners:,
+    0x0C05CFC6,
+    //values: 01 00 0A 00 0F 00  //0x0A - Axe Armor,
+    //0x0C05CFD0, //+0x0A address,
+    //room spawners:,
+    0x0C05CFDA,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x0C05CFE4, //+0x0A address,
+    //room spawners:,
+    0x0C05CFEE,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0C05CFF8, //+0x0A address,
+    //1: 01 00 20 00 05 00,
+    0x0C05D002,
+    //2: 01 00 0A 00 05 00,
+    0x0C05D082,
+    //3: 01 00 0A 00 05 00,
+    0x0C05D102,
+    //4: 01 00 4B 00 06 00,
+    0x0C05D182,
+    //5: 01 00 54 00 04 00,
+    0x0C05D202
+};
+
+int enemy_room_85[] = {
+    //num enemy types: 2, num enemies 4,
+    //0x0C1BC704, 0x0C1BC708,
+    0x02,
+    //room spawners:,
+    0x0C1BC732,
+    //values: 01 00 04 00 0F 00  //0x04 - Mad Diver,
+    //0x0C1BC73C, //+0x0A address,
+    //room spawners:,
+    0x0C1BC746,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0C1BC750, //+0x0A address,
+    //1: 01 00 04 00 04 00,
+    0x0C1BC762,
+    //2: 01 00 04 00 04 00,
+    0x0C1BC7E2,
+    //3: 01 00 04 00 04 00,
+    0x0C1BC862,
+    //4: 01 00 54 00 04 00,
+    0x0C1BC8E2
+};
+
+int enemy_room_86[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x0C34EA84, 0x0C34EA88,
+    0x01,
+    //room spawners:,
+    0x0C34EAB2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0C34EABC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x0C34EAD2,
+    //2: 01 00 54 00 04 00,
+    0x0C34EB52
+};
+
+int enemy_room_87[] = {
+    //num enemy types: 2, num enemies 4,
+    //0x0C555E84, 0x0C555E88,
+    0x02,
+    //room spawners:,
+    0x0C555EB2,
+    //values: 01 00 65 00 0F 00  //0x65 - Hanged Man,
+    //0x0C555EBC, //+0x0A address,
+    //room spawners:,
+    0x0C555EC6,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0C555ED0, //+0x0A address,
+    //1: 01 00 65 00 14 00,
+    0x0C555EE2,
+    //2: 01 00 65 00 14 00,
+    0x0C555F62,
+    //3: 01 00 54 00 04 00,
+    0x0C555FE2,
+    //4: 01 00 54 00 04 00,
+    0x0C556062
+};
+
+int enemy_room_88[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x0C6C0084, 0x0C6C0088,
+    0x01,
+    //room spawners:,
+    0x0C6C00B2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0C6C00BC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x0C6C00D2,
+    //2: 01 00 54 00 04 00,
+    0x0C6C0152
+};
+
+int enemy_room_89[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x0C8E9684, 0x0C8E9688,
+    0x02,
+    //room spawners:,
+    0x0C8E96B2,
+    //values: 01 00 4E 00 0F 00  //0x4E - Hellhound,
+    //0x0C8E96BC, //+0x0A address,
+    //room spawners:,
+    0x0C8E96C6,
+    //values: 01 00 6A 00 0F 00  //0x6A - Flame Demon,
+    //0x0C8E96D0, //+0x0A address,
+    //1: 01 00 6A 00 04 00,
+    0x0C8E96E2,
+    //2: 01 00 4E 00 04 00,
+    0x0C8E9762,
+    //3: 01 00 4E 00 04 00,
+    0x0C8E97E2,
+    //4: 01 00 4E 00 04 00,
+    0x0C8E9862,
+    //5: 01 00 4E 00 04 00,
+    0x0C8E98E2,
+    //6: 01 00 6A 00 04 00,
+    0x0C8E9962
+};
+
+int enemy_room_90[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x0CA5F284, 0x0CA5F288,
+    0x02,
+    //room spawners:,
+    0x0CA5F2B2,
+    //values: 01 00 23 00 0F 00  //0x23 - Astral Warrior,
+    //0x0CA5F2BC, //+0x0A address,
+    //room spawners:,
+    0x0CA5F2C6,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x0CA5F2D0, //+0x0A address,
+    //1: 01 00 23 00 07 00,
+    0x0CA5F2E2,
+    //2: 01 00 23 00 07 00,
+    0x0CA5F362,
+    //3: 01 00 23 00 07 00,
+    0x0CA5F3E2,
+    //4: 01 00 23 00 07 00,
+    0x0CA5F462,
+    //5: 01 00 4B 00 06 00,
+    0x0CA5F4E2
+};
+
+int enemy_room_91[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x0CC00D84, 0x0CC00D88,
+    0x01,
+    //room spawners:,
+    0x0CC00DB2,
+    //values: 01 00 57 00 02 00  //0x57 - Red Ogre,
+    //0x0CC00DBC, //+0x0A address,
+    //1: 01 00 57 00 05 00,
+    0x0CC00DD2,
+    //2: 01 00 57 00 05 00,
+    0x0CC00E52
+};
+
+int enemy_room_92[] = {
+    //num enemy types: 3, num enemies 10,
+    //0x0CD90184, 0x0CD90188,
+    0x03,
+    //room spawners:,
+    0x0CD901B2,
+    //values: 01 00 25 00 0F 00  //0x25 - Flame Zombie,
+    //0x0CD901BC, //+0x0A address,
+    //room spawners:,
+    0x0CD901C6,
+    //values: 01 00 2E 00 02 00  //0x2E - Dullahan,
+    //0x0CD901D0, //+0x0A address,
+    //room spawners:,
+    0x0CD901DA,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x0CD901E4, //+0x0A address,
+    //1: 01 00 25 00 05 00,
+    0x0CD901F2,
+    //2: 01 00 25 00 05 00,
+    0x0CD90272,
+    //3: 01 00 25 00 05 00,
+    0x0CD902F2,
+    //4: 01 00 2E 00 05 00,
+    0x0CD90372,
+    //5: 01 00 2E 00 05 00,
+    0x0CD903F2,
+    //6: 01 00 2E 00 05 00,
+    0x0CD90472,
+    //7: 01 00 2E 00 05 00,
+    0x0CD904F2,
+    //8: 01 00 2E 00 05 00,
+    0x0CD90572,
+    //9: 01 00 2E 00 05 00,
+    0x0CD905F2,
+    //10: 01 00 4B 00 06 00,
+    0x0CD90672
+};
+
+int enemy_room_93[] = {
+    //num enemy types: 1, num enemies 6,
+    //0x0CED6A84, 0x0CED6A88,
+    0x01,
+    //room spawners:,
+    0x0CED6AB2,
+    //values: 01 00 39 00 0F 00  //0x39 - Flame Sword,
+    //0x0CED6ABC, //+0x0A address,
+    //1: 01 00 39 00 05 00,
+    0x0CED6AD2,
+    //2: 01 00 39 00 05 00,
+    0x0CED6B52,
+    //3: 01 00 39 00 05 00,
+    0x0CED6BD2,
+    //4: 01 00 39 00 05 00,
+    0x0CED6C52,
+    //5: 01 00 39 00 05 00,
+    0x0CED6CD2,
+    //6: 01 00 39 00 05 00,
+    0x0CED6D52
+};
+
+int enemy_room_94[] = {
+    //num enemy types: 2, num enemies 7,
+    //0x0D05C404, 0x0D05C408,
+    0x02,
+    //room spawners:,
+    0x0D05C432,
+    //values: 01 00 4E 00 02 00  //0x4E - Hellhound,
+    //0x0D05C43C, //+0x0A address,
+    //room spawners:,
+    0x0D05C446,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0D05C450, //+0x0A address,
+    //1: 01 00 4E 00 04 00,
+    0x0D05C462,
+    //2: 01 00 4E 00 04 00,
+    0x0D05C4E2,
+    //3: 01 00 4E 00 04 00,
+    0x0D05C562,
+    //4: 01 00 4E 00 04 00,
+    0x0D05C5E2,
+    //5: 01 00 4E 00 04 00,
+    0x0D05C662,
+    //6: 01 00 4E 00 04 00,
+    0x0D05C6E2,
+    //7: 01 00 54 00 04 00,
+    0x0D05C762
+};
+
+int enemy_room_95[] = {
+    //num enemy types: 1, num enemies 6,
+    //0x0D1A3984, 0x0D1A3988,
+    0x01,
+    //room spawners:,
+    0x0D1A39B2,
+    //values: 01 00 25 00 0F 00  //0x25 - Flame Zombie,
+    //0x0D1A39BC, //+0x0A address,
+    //1: 01 00 25 00 05 00,
+    0x0D1A39D2,
+    //2: 01 00 25 00 05 00,
+    0x0D1A3A52,
+    //3: 01 00 25 00 05 00,
+    0x0D1A3AD2,
+    //4: 01 00 25 00 05 00,
+    0x0D1A3B52,
+    //5: 01 00 25 00 05 00,
+    0x0D1A3BD2,
+    //6: 01 00 25 00 05 00,
+    0x0D1A3C52
+};
+
+int enemy_room_96[] = {
+    //num enemy types: 3, num enemies 13,
+    //0x0D32B804, 0x0D32B808,
+    0x03,
+    //room spawners:,
+    0x0D32B832,
+    //values: 01 00 2E 00 02 00  //0x2E - Dullahan,
+    //0x0D32B83C, //+0x0A address,
+    //room spawners:,
+    0x0D32B846,
+    //values: 01 00 25 00 0F 00  //0x25 - Flame Zombie,
+    //0x0D32B850, //+0x0A address,
+    //room spawners:,
+    0x0D32B85A,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x0D32B864, //+0x0A address,
+    //1: 01 00 25 00 05 00,
+    0x0D32B872,
+    //2: 01 00 25 00 05 00,
+    0x0D32B8F2,
+    //3: 01 00 25 00 05 00,
+    0x0D32B972,
+    //4: 01 00 25 00 05 00,
+    0x0D32B9F2,
+    //5: 01 00 25 00 05 00,
+    0x0D32BA72,
+    //6: 01 00 25 00 05 00,
+    0x0D32BAF2,
+    //7: 01 00 2E 00 05 00,
+    0x0D32BB72,
+    //8: 01 00 2E 00 05 00,
+    0x0D32BBF2,
+    //9: 01 00 2E 00 05 00,
+    0x0D32BC72,
+    //10: 01 00 2E 00 05 00,
+    0x0D32BCF2,
+    //11: 01 00 2E 00 05 00,
+    0x0D32BD72,
+    //12: 01 00 2E 00 05 00,
+    0x0D32BDF2,
+    //13: 01 00 4B 00 06 00,
+    0x0D32BE72
+};
+
+int enemy_room_97[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x0D4CC284, 0x0D4CC288,
+    0x01,
+    //room spawners:,
+    0x0D4CC2B2,
+    //values: 01 00 57 00 02 00  //0x57 - Red Ogre,
+    //0x0D4CC2BC, //+0x0A address,
+    //1: 01 00 57 00 05 00,
+    0x0D4CC2D2,
+    //2: 01 00 57 00 05 00,
+    0x0D4CC352
+};
+
+int enemy_room_98[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x0D62B484, 0x0D62B488,
+    0x02,
+    //room spawners:,
+    0x0D62B4B2,
+    //values: 01 00 2E 00 02 00  //0x2E - Dullahan,
+    //0x0D62B4BC, //+0x0A address,
+    //room spawners:,
+    0x0D62B4C6,
+    //values: 01 00 6A 00 02 00  //0x6A - Flame Demon,
+    //0x0D62B4D0, //+0x0A address,
+    //1: 01 00 6A 00 04 00,
+    0x0D62B4E2,
+    //2: 01 00 2E 00 04 00,
+    0x0D62B562,
+    //3: 01 00 2E 00 04 00,
+    0x0D62B5E2,
+    //4: 01 00 6A 00 04 00,
+    0x0D62B662,
+    //5: 01 00 2E 00 04 00,
+    0x0D62B6E2,
+    //6: 01 00 2E 00 04 00,
+    0x0D62B762
+};
+
+int enemy_room_99[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x0D783284, 0x0D783288,
+    0x02,
+    //room spawners:,
+    0x0D7832B2,
+    //values: 01 00 38 00 0F 00  //0x38 - Peeping Eye,
+    //0x0D7832BC, //+0x0A address,
+    //room spawners:,
+    0x0D7832C6,
+    //values: 01 00 62 00 02 00  //0x62 - Flea Man,
+    //0x0D7832D0, //+0x0A address,
+    //1: 01 00 38 00 05 00,
+    0x0D7832E2,
+    //2: 01 00 38 00 04 00,
+    0x0D783362,
+    //3: 01 00 38 00 04 00,
+    0x0D7833E2,
+    //4: 01 00 62 00 04 00,
+    0x0D783462,
+    //5: 01 00 62 00 04 00,
+    0x0D7834E2,
+    //6: 01 00 62 00 04 00,
+    0x0D783562
+};
+
+int enemy_room_100[] = {
+    //num enemy types: 2, num enemies 3,
+    //0x0D8DDB04, 0x0D8DDB08,
+    0x02,
+    //room spawners:,
+    0x0D8DDB32,
+    //values: 01 00 20 00 0F 00  //0x20 - Axe Knight,
+    //0x0D8DDB3C, //+0x0A address,
+    //room spawners:,
+    0x0D8DDB46,
+    //values: 01 00 4E 00 0F 00  //0x4E - Hellhound,
+    //0x0D8DDB50, //+0x0A address,
+    //1: 01 00 20 00 05 00,
+    0x0D8DDB62,
+    //2: 01 00 4E 00 05 00,
+    0x0D8DDBE2,
+    //3: 01 00 4E 00 05 00,
+    0x0D8DDC62
+};
+
+int enemy_room_101[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x0DA62184, 0x0DA62188,
+    0x02,
+    //room spawners:,
+    0x0DA621B2,
+    //values: 01 00 04 00 02 00  //0x04 - Mad Diver,
+    //0x0DA621BC, //+0x0A address,
+    //room spawners:,
+    0x0DA621C6,
+    //values: 01 00 65 00 02 00  //0x65 - Hanged Man,
+    //0x0DA621D0, //+0x0A address,
+    //1: 01 00 65 00 04 00,
+    0x0DA621E2,
+    //2: 01 00 65 00 04 00,
+    0x0DA62262,
+    //3: 01 00 65 00 04 00,
+    0x0DA622E2,
+    //4: 01 00 65 00 04 00,
+    0x0DA62362,
+    //5: 01 00 04 00 04 00,
+    0x0DA623E2,
+    //6: 01 00 04 00 04 00,
+    0x0DA62462
+};
+
+int enemy_room_102[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x0DBAF004, 0x0DBAF008,
+    0x02,
+    //room spawners:,
+    0x0DBAF032,
+    //values: 01 00 38 00 0F 00  //0x38 - Peeping Eye,
+    //0x0DBAF03C, //+0x0A address,
+    //room spawners:,
+    0x0DBAF046,
+    //values: 01 00 30 00 02 00  //0x30 - Skeleton Hunter,
+    //0x0DBAF050, //+0x0A address,
+    //1: 01 00 38 00 05 00,
+    0x0DBAF062,
+    //2: 01 00 38 00 04 00,
+    0x0DBAF0E2,
+    //3: 01 00 38 00 04 00,
+    0x0DBAF162,
+    //4: 01 00 30 00 04 00,
+    0x0DBAF1E2,
+    //5: 01 00 30 00 04 00,
+    0x0DBAF262,
+    //6: 01 00 30 00 04 00,
+    0x0DBAF2E2
+};
+
+int enemy_room_103[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x0DD0C384, 0x0DD0C388,
+    0x01,
+    //room spawners:,
+    0x0DD0C3B2,
+    //values: 01 00 6A 00 02 00  //0x6A - Flame Demon,
+    //0x0DD0C3BC, //+0x0A address,
+    //1: 01 00 6A 00 04 00,
+    0x0DD0C3D2,
+    //2: 01 00 6A 00 04 00,
+    0x0DD0C452
+};
+
+int enemy_room_104[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x0DE97D84, 0x0DE97D88,
+    0x01,
+    //room spawners:,
+    0x0DE97DB2,
+    //values: 01 00 23 00 02 00  //0x23 - Astral Warrior,
+    //0x0DE97DBC, //+0x0A address,
+    //1: 01 00 23 00 14 00,
+    0x0DE97DD2
+};
+
+int enemy_room_105[] = {
+    //num enemy types: 2, num enemies 4,
+    //0x0DFF6A04, 0x0DFF6A08,
+    0x02,
+    //room spawners:,
+    0x0DFF6A32,
+    //values: 01 00 25 00 00 00  //0x25 - Flame Zombie,
+    //0x0DFF6A3C, //+0x0A address,
+    //room spawners:,
+    0x0DFF6A46,
+    //values: 01 00 39 00 00 00  //0x39 - Flame Sword,
+    //0x0DFF6A50, //+0x0A address,
+    //1: 01 00 25 00 04 00,
+    0x0DFF6A62,
+    //2: 01 00 25 00 04 00,
+    0x0DFF6AE2,
+    //3: 01 00 39 00 04 00,
+    0x0DFF6B62,
+    //4: 01 00 39 00 04 00,
+    0x0DFF6BE2
+};
+
+int enemy_room_106[] = {
+    //num enemy types: 3, num enemies 7,
+    //0x0E38A104, 0x0E38A108,
+    0x03,
+    //room spawners:,
+    0x0E38A132,
+    //values: 01 00 40 00 0F 00  //0x40 - ???,
+    //0x0E38A13C, //+0x0A address,
+    //room spawners:,
+    0x0E38A146,
+    //values: 01 00 71 00 02 00  //0x71 - Lizard Knight,
+    //0x0E38A150, //+0x0A address,
+    //room spawners:,
+    0x0E38A15A,
+    //values: 01 00 0C 00 0F 00  //0x0C - Skeleton,
+    //0x0E38A164, //+0x0A address,
+    //1: 01 00 40 00 04 00,
+    0x0E38A172,
+    //2: 01 00 71 00 06 00,
+    0x0E38A1F2,
+    //3: 01 00 71 00 06 00,
+    0x0E38A272,
+    //4: 01 00 0C 00 06 00,
+    0x0E38A2F2,
+    //5: 01 00 0C 00 06 00,
+    0x0E38A372,
+    //6: 01 00 0C 00 06 00,
+    0x0E38A3F2,
+    //7: 01 00 0C 00 06 00,
+    0x0E38A472
+};
+
+int enemy_room_107[] = {
+    //num enemy types: 3, num enemies 7,
+    //0x0E51A804, 0x0E51A808,
+    0x03,
+    //room spawners:,
+    0x0E51A832,
+    //values: 01 00 11 00 0F 00  //0x11 - Skeleton Swordsman,
+    //0x0E51A83C, //+0x0A address,
+    //room spawners:,
+    0x0E51A846,
+    //values: 01 00 62 00 02 00  //0x62 - Flea Man,
+    //0x0E51A850, //+0x0A address,
+    //room spawners:,
+    0x0E51A85A,
+    //values: 01 00 05 00 0F 00  //0x05 - Fish Man,
+    //0x0E51A864, //+0x0A address,
+    //1: 01 00 11 00 16 00,
+    0x0E51A872,
+    //2: 01 00 05 00 16 00,
+    0x0E51A8F2,
+    //3: 01 00 62 00 06 00,
+    0x0E51A972,
+    //4: 01 00 62 00 06 00,
+    0x0E51A9F2,
+    //5: 01 00 62 00 06 00,
+    0x0E51AA72,
+    //6: 01 00 62 00 06 00,
+    0x0E51AAF2,
+    //7: 01 00 62 00 06 00,
+    0x0E51AB72
+};
+
+int enemy_room_108[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x0E6ADE04, 0x0E6ADE08,
+    0x02,
+    //room spawners:,
+    0x0E6ADE32,
+    //values: 01 00 6B 00 0F 00  //0x6B - Frost Demon,
+    //0x0E6ADE3C, //+0x0A address,
+    //room spawners:,
+    0x0E6ADE46,
+    //values: 01 00 0B 00 0F 00  //0x0B - Frost Sword,
+    //0x0E6ADE50, //+0x0A address,
+    //1: 01 00 6B 00 04 00,
+    0x0E6ADE62,
+    //2: 01 00 6B 00 04 00,
+    0x0E6ADEE2,
+    //3: 01 00 0B 00 04 00,
+    0x0E6ADF62,
+    //4: 01 00 0B 00 04 00,
+    0x0E6ADFE2,
+    //5: 01 00 0B 00 04 00,
+    0x0E6AE062
+};
+
+int enemy_room_109[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x0E83B484, 0x0E83B488,
+    0x02,
+    //room spawners:,
+    0x0E83B4B2,
+    //values: 01 00 29 00 0F 00  //0x29 - Merman,
+    //0x0E83B4BC, //+0x0A address,
+    //room spawners:,
+    0x0E83B4C6,
+    //values: 01 00 05 00 0F 00  //0x05 - Fish Man,
+    //0x0E83B4D0, //+0x0A address,
+    //1: 01 00 29 00 06 00,
+    0x0E83B4E2,
+    //2: 01 00 05 00 06 00,
+    0x0E83B562,
+    //3: 01 00 05 00 06 00,
+    0x0E83B5E2,
+    //4: 01 00 05 00 06 00,
+    0x0E83B662,
+    //5: 01 00 05 00 06 00,
+    0x0E83B6E2,
+    //6: 01 00 29 00 16 00,
+    0x0E83B762
+};
+
+int enemy_room_110[] = {
+    //num enemy types: 2, num enemies 7,
+    //0x0E9D4204, 0x0E9D4208,
+    0x02,
+    //room spawners:,
+    0x0E9D4232,
+    //values: 01 00 0B 00 0F 00  //0x0B - Frost Sword,
+    //0x0E9D423C, //+0x0A address,
+    //room spawners:,
+    0x0E9D4246,
+    //values: 01 00 05 00 0F 00  //0x05 - Fish Man,
+    //0x0E9D4250, //+0x0A address,
+    //1: 01 00 0B 00 04 00,
+    0x0E9D4262,
+    //2: 01 00 05 00 04 00,
+    0x0E9D42E2,
+    //3: 01 00 05 00 04 00,
+    0x0E9D4362,
+    //4: 01 00 05 00 04 00,
+    0x0E9D43E2,
+    //5: 01 00 05 00 04 00,
+    0x0E9D4462,
+    //6: 01 00 0B 00 04 00,
+    0x0E9D44E2,
+    //7: 01 00 0B 00 04 00,
+    0x0E9D4562
+};
+
+int enemy_room_111[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x0EB64904, 0x0EB64908,
+    0x02,
+    //room spawners:,
+    0x0EB64932,
+    //values: 01 00 62 00 0F 00  //0x62 - Flea Man,
+    //0x0EB6493C, //+0x0A address,
+    //room spawners:,
+    0x0EB64946,
+    //values: 01 00 2F 00 02 00  //0x2F - Phantom,
+    //0x0EB64950, //+0x0A address,
+    //1: 01 00 62 00 06 00,
+    0x0EB64962,
+    //2: 01 00 62 00 16 00,
+    0x0EB649E2,
+    //3: 01 00 62 00 16 00,
+    0x0EB64A62,
+    //4: 01 00 2F 00 06 00,
+    0x0EB64AE2,
+    //5: 01 00 2F 00 06 00,
+    0x0EB64B62
+};
+
+int enemy_room_112[] = {
+    //num enemy types: 4, num enemies 9,
+    //0x0ECFB084, 0x0ECFB088,
+    0x04,
+    //room spawners:,
+    0x0ECFB0B2,
+    //values: 01 00 1A 00 0F 00  //0x1A - Heavy Armor,
+    //0x0ECFB0BC, //+0x0A address,
+    //room spawners:,
+    0x0ECFB0C6,
+    //values: 01 00 2A 00 0F 00  //0x2A - Vassago,
+    //0x0ECFB0D0, //+0x0A address,
+    //room spawners:,
+    0x0ECFB0DA,
+    //values: 01 00 0D 00 0F 00  //0x0D - Skeleton Soldier,
+    //0x0ECFB0E4, //+0x0A address,
+    //room spawners:,
+    0x0ECFB0EE,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0ECFB0F8, //+0x0A address,
+    //1: 01 00 1A 00 06 00,
+    0x0ECFB102,
+    //2: 01 00 0D 00 06 00,
+    0x0ECFB182,
+    //3: 01 00 0D 00 06 00,
+    0x0ECFB202,
+    //4: 01 00 0D 00 06 00,
+    0x0ECFB282,
+    //5: 01 00 0D 00 06 00,
+    0x0ECFB302,
+    //6: 01 00 0D 00 06 00,
+    0x0ECFB382,
+    //7: 01 00 0D 00 06 00,
+    0x0ECFB402,
+    //8: 01 00 2A 00 16 00,
+    0x0ECFB482,
+    //9: 01 00 54 00 04 00,
+    0x0ECFB502
+};
+
+int enemy_room_113[] = {
+    //num enemy types: 3, num enemies 7,
+    //0x0EEA1E04, 0x0EEA1E08,
+    0x03,
+    //room spawners:,
+    0x0EEA1E32,
+    //values: 01 00 0A 00 0F 00  //0x0A - Axe Armor,
+    //0x0EEA1E3C, //+0x0A address,
+    //room spawners:,
+    0x0EEA1E46,
+    //values: 01 00 03 00 0F 00  //0x03 - Red Skeleton,
+    //0x0EEA1E50, //+0x0A address,
+    //room spawners:,
+    0x0EEA1E5A,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x0EEA1E64, //+0x0A address,
+    //1: 01 00 0A 00 05 00,
+    0x0EEA1E72,
+    //2: 01 00 0A 00 05 00,
+    0x0EEA1EF2,
+    //3: 01 00 03 00 04 00,
+    0x0EEA1F72,
+    //4: 01 00 03 00 04 00,
+    0x0EEA1FF2,
+    //5: 01 00 03 00 04 00,
+    0x0EEA2072,
+    //6: 01 00 03 00 04 00,
+    0x0EEA20F2,
+    //7: 01 00 4B 00 06 00,
+    0x0EEA2172
+};
+
+int enemy_room_114[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x0F032A84, 0x0F032A88,
+    0x02,
+    //room spawners:,
+    0x0F032AB2,
+    //values: 01 00 29 00 0F 00  //0x29 - Merman,
+    //0x0F032ABC, //+0x0A address,
+    //room spawners:,
+    0x0F032AC6,
+    //values: 01 00 05 00 0F 00  //0x05 - Fish Man,
+    //0x0F032AD0, //+0x0A address,
+    //1: 01 00 29 00 04 00,
+    0x0F032AE2,
+    //2: 01 00 05 00 05 00,
+    0x0F032B62,
+    //3: 01 00 05 00 05 00,
+    0x0F032BE2,
+    //4: 01 00 05 00 04 00,
+    0x0F032C62,
+    //5: 01 00 05 00 04 00,
+    0x0F032CE2
+};
+
+int enemy_room_115[] = {
+    //num enemy types: 3, num enemies 7,
+    //0x0F1C5C84, 0x0F1C5C88,
+    0x03,
+    //room spawners:,
+    0x0F1C5CB2,
+    //values: 01 00 29 00 0F 00  //0x29 - Merman,
+    //0x0F1C5CBC, //+0x0A address,
+    //room spawners:,
+    0x0F1C5CC6,
+    //values: 01 00 1A 00 02 00  //0x1A - Heavy Armor,
+    //0x0F1C5CD0, //+0x0A address,
+    //room spawners:,
+    0x0F1C5CDA,
+    //values: 01 00 62 00 0F 00  //0x62 - Flea Man,
+    //0x0F1C5CE4, //+0x0A address,
+    //1: 01 00 29 00 06 00,
+    0x0F1C5CF2,
+    //2: 01 00 29 00 06 00,
+    0x0F1C5D72,
+    //3: 01 00 62 00 16 00,
+    0x0F1C5DF2,
+    //4: 01 00 1A 00 06 00,
+    0x0F1C5E72,
+    //5: 01 00 1A 00 06 00,
+    0x0F1C5EF2,
+    //6: 01 00 1A 00 06 00,
+    0x0F1C5F72,
+    //7: 01 00 1A 00 06 00,
+    0x0F1C5FF2
+};
+
+int enemy_room_116[] = {
+    //num enemy types: 3, num enemies 7,
+    //0x0F354F84, 0x0F354F88,
+    0x03,
+    //room spawners:,
+    0x0F354FB2,
+    //values: 01 00 6B 00 0F 00  //0x6B - Frost Demon,
+    //0x0F354FBC, //+0x0A address,
+    //room spawners:,
+    0x0F354FC6,
+    //values: 01 00 69 00 02 00  //0x69 - Death Ripper,
+    //0x0F354FD0, //+0x0A address,
+    //room spawners:,
+    0x0F354FDA,
+    //values: 01 00 1A 00 0F 00  //0x1A - Heavy Armor,
+    //0x0F354FE4, //+0x0A address,
+    //1: 01 00 6B 00 06 00,
+    0x0F354FF2,
+    //2: 01 00 6B 00 06 00,
+    0x0F355072,
+    //3: 01 00 1A 00 06 00,
+    0x0F3550F2,
+    //4: 01 00 69 00 16 00,
+    0x0F355172,
+    //5: 01 00 1A 00 06 00,
+    0x0F3551F2,
+    //6: 01 00 1A 00 06 00,
+    0x0F355272,
+    //7: 01 00 1A 00 06 00,
+    0x0F3552F2
+};
+
+int enemy_room_117[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x0F4E6904, 0x0F4E6908,
+    0x02,
+    //room spawners:,
+    0x0F4E6932,
+    //values: 01 00 29 00 0F 00  //0x29 - Merman,
+    //0x0F4E693C, //+0x0A address,
+    //room spawners:,
+    0x0F4E6946,
+    //values: 01 00 15 00 0F 00  //0x15 - Armor Knight,
+    //0x0F4E6950, //+0x0A address,
+    //1: 01 00 29 00 04 00,
+    0x0F4E6962,
+    //2: 01 00 29 00 04 00,
+    0x0F4E69E2,
+    //3: 01 00 29 00 04 00,
+    0x0F4E6A62,
+    //4: 01 00 29 00 04 00,
+    0x0F4E6AE2,
+    //5: 01 00 15 00 05 00,
+    0x0F4E6B62,
+    //6: 01 00 15 00 05 00,
+    0x0F4E6BE2
+};
+
+int enemy_room_118[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x0F678F84, 0x0F678F88,
+    0x02,
+    //room spawners:,
+    0x0F678FB2,
+    //values: 01 00 53 00 0F 00  //0x53 - Cyclops,
+    //0x0F678FBC, //+0x0A address,
+    //room spawners:,
+    0x0F678FC6,
+    //values: 01 00 29 00 0F 00  //0x29 - Merman,
+    //0x0F678FD0, //+0x0A address,
+    //1: 01 00 53 00 05 00,
+    0x0F678FE2,
+    //2: 01 00 53 00 04 00,
+    0x0F679062,
+    //3: 01 00 29 00 04 00,
+    0x0F6790E2,
+    //4: 01 00 29 00 04 00,
+    0x0F679162,
+    //5: 01 00 29 00 04 00,
+    0x0F6791E2,
+    //6: 01 00 29 00 04 00,
+    0x0F679262
+};
+
+int enemy_room_119[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x0F80CB04, 0x0F80CB08,
+    0x02,
+    //room spawners:,
+    0x0F80CB32,
+    //values: 01 00 6F 00 0F 00  //0x6F - Lizard Man,
+    //0x0F80CB3C, //+0x0A address,
+    //room spawners:,
+    0x0F80CB46,
+    //values: 01 00 53 00 0F 00  //0x53 - Cyclops,
+    //0x0F80CB50, //+0x0A address,
+    //1: 01 00 6F 00 04 00,
+    0x0F80CB62,
+    //2: 01 00 6F 00 04 00,
+    0x0F80CBE2,
+    //3: 01 00 53 00 04 00,
+    0x0F80CC62,
+    //4: 01 00 6F 00 04 00,
+    0x0F80CCE2,
+    //5: 01 00 6F 00 04 00,
+    0x0F80CD62
+};
+
+int enemy_room_120[] = {
+    //num enemy types: 3, num enemies 6,
+    //0x0F9B0604, 0x0F9B0608,
+    0x03,
+    //room spawners:,
+    0x0F9B0632,
+    //values: 01 00 6F 00 0F 00  //0x6F - Lizard Man,
+    //0x0F9B063C, //+0x0A address,
+    //room spawners:,
+    0x0F9B0646,
+    //values: 01 00 71 00 02 00  //0x71 - Lizard Knight,
+    //0x0F9B0650, //+0x0A address,
+    //room spawners:,
+    0x0F9B065A,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x0F9B0664, //+0x0A address,
+    //1: 01 00 6F 00 14 00,
+    0x0F9B0672,
+    //2: 01 00 6F 00 14 00,
+    0x0F9B06F2,
+    //3: 01 00 71 00 04 00,
+    0x0F9B0772,
+    //4: 01 00 71 00 04 00,
+    0x0F9B07F2,
+    //5: 01 00 54 00 04 00,
+    0x0F9B0872,
+    //6: 01 00 54 00 04 00,
+    0x0F9B08F2
+};
+
+int enemy_room_121[] = {
+    //num enemy types: 3, num enemies 14,
+    //0x0FB66984, 0x0FB66988,
+    0x03,
+    //room spawners:,
+    0x0FB669B2,
+    //values: 01 00 3D 00 0F 00  //0x3D - Doppleganger,
+    //0x0FB669BC, //+0x0A address,
+    //room spawners:,
+    0x0FB669C6,
+    //values: 01 00 73 00 0F 00  //0x73 - ???,
+    //0x0FB669D0, //+0x0A address,
+    //room spawners:,
+    0x0FB669DA,
+    //values: 01 00 72 00 0F 00  //0x72 - ???,
+    //0x0FB669E4, //+0x0A address,
+    //1: 01 00 3D 00 07 00,
+    0x0FB669F2,
+    //2: 01 00 3D 00 07 00,
+    0x0FB66A72,
+    //3: 01 00 72 00 06 00,
+    0x0FB66AF2,
+    //4: 01 00 73 00 06 00,
+    0x0FB66B72,
+    //5: 01 00 72 00 06 00,
+    0x0FB66BF2,
+    //6: 01 00 72 00 06 00,
+    0x0FB66C72,
+    //7: 01 00 3D 00 07 00,
+    0x0FB66CF2,
+    //8: 01 00 3D 00 07 00,
+    0x0FB66D72,
+    //9: 01 00 72 00 06 00,
+    0x0FB66DF2,
+    //10: 01 00 72 00 06 00,
+    0x0FB66E72,
+    //11: 01 00 72 00 06 00,
+    0x0FB66EF2,
+    //12: 01 00 72 00 06 00,
+    0x0FB66F72,
+    //13: 01 00 3D 00 06 00,
+    0x0FB66FF2,
+    //14: 01 00 3D 00 06 00,
+    0x0FB67072
+};
+
+int enemy_room_122[] = {
+    //num enemy types: 1, num enemies 4,
+    //0x0FD6C584, 0x0FD6C588,
+    0x01,
+    //room spawners:,
+    0x0FD6C5B2,
+    //values: 01 00 05 00 0F 00  //0x05 - Fish Man,
+    //0x0FD6C5BC, //+0x0A address,
+    //1: 01 00 05 00 04 00,
+    0x0FD6C5D2,
+    //2: 01 00 05 00 04 00,
+    0x0FD6C652,
+    //3: 01 00 05 00 05 00,
+    0x0FD6C6D2,
+    //4: 01 00 05 00 05 00,
+    0x0FD6C752
+};
+
+int enemy_room_123[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x0FF71084, 0x0FF71088,
+    0x02,
+    //room spawners:,
+    0x0FF710B2,
+    //values: 01 00 05 00 0F 00  //0x05 - Fish Man,
+    //0x0FF710BC, //+0x0A address,
+    //room spawners:,
+    0x0FF710C6,
+    //values: 01 00 30 00 02 00  //0x30 - Skeleton Hunter,
+    //0x0FF710D0, //+0x0A address,
+    //1: 01 00 05 00 04 00,
+    0x0FF710E2,
+    //2: 01 00 05 00 04 00,
+    0x0FF71162,
+    //3: 01 00 05 00 04 00,
+    0x0FF711E2,
+    //4: 01 00 05 00 05 00,
+    0x0FF71262,
+    //5: 01 00 30 00 04 00,
+    0x0FF712E2,
+    //6: 01 00 30 00 04 00,
+    0x0FF71362
+};
+
+int enemy_room_124[] = {
+    //num enemy types: 2, num enemies 4,
+    //0x10172704, 0x10172708,
+    0x02,
+    //room spawners:,
+    0x10172732,
+    //values: 01 00 1A 00 0F 00  //0x1A - Heavy Armor,
+    //0x1017273C, //+0x0A address,
+    //room spawners:,
+    0x10172746,
+    //values: 01 00 05 00 0F 00  //0x05 - Fish Man,
+    //0x10172750, //+0x0A address,
+    //1: 01 00 1A 00 05 00,
+    0x10172762,
+    //2: 01 00 05 00 04 00,
+    0x101727E2,
+    //3: 01 00 05 00 04 00,
+    0x10172862,
+    //4: 01 00 05 00 04 00,
+    0x101728E2
+};
+
+int enemy_room_125[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x1036A284, 0x1036A288,
+    0x02,
+    //room spawners:,
+    0x1036A2B2,
+    //values: 01 00 29 00 0F 00  //0x29 - Merman,
+    //0x1036A2BC, //+0x0A address,
+    //room spawners:,
+    0x1036A2C6,
+    //values: 01 00 6F 00 0F 00  //0x6F - Lizard Man,
+    //0x1036A2D0, //+0x0A address,
+    //1: 01 00 29 00 05 00,
+    0x1036A2E2,
+    //2: 01 00 29 00 05 00,
+    0x1036A362,
+    //3: 01 00 29 00 04 00,
+    0x1036A3E2,
+    //4: 01 00 6F 00 04 00,
+    0x1036A462,
+    //5: 01 00 6F 00 04 00,
+    0x1036A4E2
+};
+
+int enemy_room_126[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x10580F84, 0x10580F88,
+    0x02,
+    //room spawners:,
+    0x10580FB2,
+    //values: 01 00 1A 00 0F 00  //0x1A - Heavy Armor,
+    //0x10580FBC, //+0x0A address,
+    //room spawners:,
+    0x10580FC6,
+    //values: 01 00 29 00 0F 00  //0x29 - Merman,
+    //0x10580FD0, //+0x0A address,
+    //1: 01 00 1A 00 04 00,
+    0x10580FE2,
+    //2: 01 00 29 00 05 00,
+    0x10581062,
+    //3: 01 00 29 00 05 00,
+    0x105810E2,
+    //4: 01 00 29 00 05 00,
+    0x10581162,
+    //5: 01 00 29 00 05 00,
+    0x105811E2,
+    //6: 01 00 1A 00 04 00,
+    0x10581262
+};
+
+int enemy_room_127[] = {
+    //num enemy types: 4, num enemies 10,
+    //0x10786884, 0x10786888,
+    0x04,
+    //room spawners:,
+    0x107868B2,
+    //values: 01 00 17 00 0F 00  //0x17 - Skeleton Archer,
+    //0x107868BC, //+0x0A address,
+    //room spawners:,
+    0x107868C6,
+    //values: 01 00 71 00 02 00  //0x71 - Lizard Knight,
+    //0x107868D0, //+0x0A address,
+    //room spawners:,
+    0x107868DA,
+    //values: 01 00 6F 00 0D 00  //0x6F - Lizard Man,
+    //0x107868E4, //+0x0A address,
+    //room spawners:,
+    0x107868EE,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x107868F8, //+0x0A address,
+    //1: 01 00 17 00 04 00,
+    0x10786902,
+    //2: 01 00 17 00 04 00,
+    0x10786982,
+    //3: 01 00 17 00 04 00,
+    0x10786A02,
+    //4: 01 00 6F 00 04 00,
+    0x10786A82,
+    //5: 01 00 6F 00 04 00,
+    0x10786B02,
+    //6: 01 00 6F 00 04 00,
+    0x10786B82,
+    //7: 01 00 71 00 04 00,
+    0x10786C02,
+    //8: 01 00 71 00 04 00,
+    0x10786C82,
+    //9: 01 00 71 00 04 00,
+    0x10786D02,
+    //10: 01 00 4B 00 06 00,
+    0x10786D82
+};
+
+int enemy_room_128[] = {
+    //num enemy types: 3, num enemies 7,
+    //0x109BE184, 0x109BE188,
+    0x03,
+    //room spawners:,
+    0x109BE1B2,
+    //values: 01 00 53 00 0F 00  //0x53 - Cyclops,
+    //0x109BE1BC, //+0x0A address,
+    //room spawners:,
+    0x109BE1C6,
+    //values: 01 00 62 00 0D 00  //0x62 - Flea Man,
+    //0x109BE1D0, //+0x0A address,
+    //room spawners:,
+    0x109BE1DA,
+    //values: 01 00 69 00 02 00  //0x69 - Death Ripper,
+    //0x109BE1E4, //+0x0A address,
+    //1: 01 00 53 00 04 00,
+    0x109BE1F2,
+    //2: 01 00 62 00 04 00,
+    0x109BE272,
+    //3: 01 00 62 00 04 00,
+    0x109BE2F2,
+    //4: 01 00 62 00 04 00,
+    0x109BE372,
+    //5: 01 00 69 00 04 00,
+    0x109BE3F2,
+    //6: 01 00 69 00 04 00,
+    0x109BE472,
+    //7: 01 00 69 00 04 00,
+    0x109BE4F2
+};
+
+int enemy_room_129[] = {
+    //num enemy types: 3, num enemies 6,
+    //0x10BD2004, 0x10BD2008,
+    0x03,
+    //room spawners:,
+    0x10BD2032,
+    //values: 01 00 6F 00 0F 00  //0x6F - Lizard Man,
+    //0x10BD203C, //+0x0A address,
+    //room spawners:,
+    0x10BD2046,
+    //values: 01 00 53 00 02 00  //0x53 - Cyclops,
+    //0x10BD2050, //+0x0A address,
+    //room spawners:,
+    0x10BD205A,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x10BD2064, //+0x0A address,
+    //1: 01 00 6F 00 04 00,
+    0x10BD2072,
+    //2: 01 00 6F 00 04 00,
+    0x10BD20F2,
+    //3: 01 00 6F 00 04 00,
+    0x10BD2172,
+    //4: 01 00 6F 00 04 00,
+    0x10BD21F2,
+    //5: 01 00 53 00 04 00,
+    0x10BD2272,
+    //6: 01 00 54 00 04 00,
+    0x10BD22F2
+};
+
+int enemy_room_130[] = {
+    //num enemy types: 2, num enemies 9,
+    //0x10D4B004, 0x10D4B008,
+    0x02,
+    //room spawners:,
+    0x10D4B032,
+    //values: 01 00 29 00 0F 00  //0x29 - Merman,
+    //0x10D4B03C, //+0x0A address,
+    //room spawners:,
+    0x10D4B046,
+    //values: 01 00 17 00 0D 00  //0x17 - Skeleton Archer,
+    //0x10D4B050, //+0x0A address,
+    //1: 01 00 29 00 04 00,
+    0x10D4B062,
+    //2: 01 00 29 00 04 00,
+    0x10D4B0E2,
+    //3: 01 00 17 00 04 00,
+    0x10D4B162,
+    //4: 01 00 17 00 04 00,
+    0x10D4B1E2,
+    //5: 01 00 29 00 04 00,
+    0x10D4B262,
+    //6: 01 00 29 00 04 00,
+    0x10D4B2E2,
+    //7: 01 00 29 00 04 00,
+    0x10D4B362,
+    //8: 01 00 29 00 04 00,
+    0x10D4B3E2,
+    //9: 01 00 29 00 04 00,
+    0x10D4B462
+};
+
+int enemy_room_131[] = {
+    //num enemy types: 1, num enemies 3,
+    //0x10EC3C04, 0x10EC3C08,
+    0x01,
+    //room spawners:,
+    0x10EC3C32,
+    //values: 01 00 6F 00 02 00  //0x6F - Lizard Man,
+    //0x10EC3C3C, //+0x0A address,
+    //1: 01 00 6F 00 04 00,
+    0x10EC3C52,
+    //2: 01 00 6F 00 04 00,
+    0x10EC3CD2,
+    //3: 01 00 6F 00 04 00,
+    0x10EC3D52
+};
+
+int enemy_room_132[] = {
+    //num enemy types: 2, num enemies 3,
+    //0x111ABE04, 0x111ABE08,
+    0x02,
+    //room spawners:,
+    0x111ABE32,
+    //values: 01 00 29 00 0F 00  //0x29 - Merman,
+    //0x111ABE3C, //+0x0A address,
+    //room spawners:,
+    0x111ABE46,
+    //values: 01 00 53 00 02 00  //0x53 - Cyclops,
+    //0x111ABE50, //+0x0A address,
+    //1: 01 00 29 00 04 00,
+    0x111ABE62,
+    //2: 01 00 29 00 04 00,
+    0x111ABEE2,
+    //3: 01 00 53 00 04 00,
+    0x111ABF62
+};
+
+int enemy_room_133[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x11351F84, 0x11351F88,
+    0x02,
+    //room spawners:,
+    0x11351FB2,
+    //values: 01 00 62 00 0F 00  //0x62 - Flea Man,
+    //0x11351FBC, //+0x0A address,
+    //room spawners:,
+    0x11351FC6,
+    //values: 01 00 6F 00 0F 00  //0x6F - Lizard Man,
+    //0x11351FD0, //+0x0A address,
+    //1: 01 00 62 00 04 00,
+    0x11351FE2,
+    //2: 01 00 62 00 04 00,
+    0x11352062,
+    //3: 01 00 6F 00 04 00,
+    0x113520E2,
+    //4: 01 00 6F 00 04 00,
+    0x11352162,
+    //5: 01 00 6F 00 04 00,
+    0x113521E2,
+    //6: 01 00 6F 00 04 00,
+    0x11352262
+};
+
+int enemy_room_134[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x117ECB04, 0x117ECB08,
+    0x01,
+    //room spawners:,
+    0x117ECB32,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x117ECB3C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x117ECB52
+};
+
+int enemy_room_135[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x11C53284, 0x11C53288,
+    0x01,
+    //room spawners:,
+    0x11C532B2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x11C532BC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x11C532D2,
+    //2: 01 00 54 00 04 00,
+    0x11C53352
+};
+
+int enemy_room_136[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x12004404, 0x12004408,
+    0x01,
+    //room spawners:,
+    0x12004432,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x1200443C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x12004452
+};
+
+int enemy_room_137[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x12197C84, 0x12197C88,
+    0x01,
+    //room spawners:,
+    0x12197CB2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x12197CBC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x12197CD2,
+    //2: 01 00 54 00 04 00,
+    0x12197D52
+};
+
+int enemy_room_138[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x1233E084, 0x1233E088,
+    0x01,
+    //room spawners:,
+    0x1233E0B2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x1233E0BC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x1233E0D2,
+    //2: 01 00 54 00 04 00,
+    0x1233E152
+};
+
+int enemy_room_139[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x124C2004, 0x124C2008,
+    0x01,
+    //room spawners:,
+    0x124C2032,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x124C203C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x124C2052,
+    //2: 01 00 54 00 04 00,
+    0x124C20D2
+};
+
+int enemy_room_140[] = {
+    //num enemy types: 4, num enemies 11,
+    //0x129E6984, 0x129E6988,
+    0x04,
+    //room spawners:,
+    0x129E69B2,
+    //values: 01 00 12 00 00 00  //0x12 - Frost Elemental,
+    //0x129E69BC, //+0x0A address,
+    //room spawners:,
+    0x129E69C6,
+    //values: 01 00 73 00 00 00  //0x73 - ???,
+    //0x129E69D0, //+0x0A address,
+    //room spawners:,
+    0x129E69DA,
+    //values: 01 00 72 00 00 00  //0x72 - ???,
+    //0x129E69E4, //+0x0A address,
+    //room spawners:,
+    0x129E69EE,
+    //values: 01 00 74 00 00 00  //0x74 - ???,
+    //0x129E69F8, //+0x0A address,
+    //1: 01 00 12 00 06 00,
+    0x129E6A02,
+    //2: 01 00 74 00 06 00,
+    0x129E6A82,
+    //3: 01 00 72 00 06 00,
+    0x129E6B02,
+    //4: 01 00 73 00 06 00,
+    0x129E6B82,
+    //5: 01 00 72 00 06 00,
+    0x129E6C02,
+    //6: 01 00 72 00 06 00,
+    0x129E6C82,
+    //7: 01 00 72 00 06 00,
+    0x129E6D02,
+    //8: 01 00 72 00 06 00,
+    0x129E6D82,
+    //9: 01 00 72 00 06 00,
+    0x129E6E02,
+    //10: 01 00 72 00 06 00,
+    0x129E6E82,
+    //11: 01 00 12 00 06 00,
+    0x129E6F02
+};
+
+int enemy_room_141[] = {
+    //num enemy types: 4, num enemies 11,
+    //0x12B56404, 0x12B56408,
+    0x04,
+    //room spawners:,
+    0x12B56432,
+    //values: 01 00 2A 00 00 00  //0x2A - Vassago,
+    //0x12B5643C, //+0x0A address,
+    //room spawners:,
+    0x12B56446,
+    //values: 01 00 28 00 00 00  //0x28 - Rune Spirit,
+    //0x12B56450, //+0x0A address,
+    //room spawners:,
+    0x12B5645A,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x12B56464, //+0x0A address,
+    //room spawners:,
+    0x12B5646E,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x12B56478, //+0x0A address,
+    //1: 01 00 28 00 14 00,
+    0x12B56482,
+    //2: 01 00 2A 00 06 00,
+    0x12B56502,
+    //3: 01 00 2A 00 06 00,
+    0x12B56582,
+    //4: 01 00 2A 00 14 00,
+    0x12B56602,
+    //5: 01 00 2A 00 06 00,
+    0x12B56682,
+    //6: 01 00 2A 00 06 00,
+    0x12B56702,
+    //7: 01 00 4B 00 06 00,
+    0x12B56782,
+    //8: 01 00 4B 00 06 00,
+    0x12B56802,
+    //9: 01 00 54 00 04 00,
+    0x12B56882,
+    //10: 01 00 54 00 04 00,
+    0x12B56902,
+    //11: 01 00 54 00 04 00,
+    0x12B56982
+};
+
+int enemy_room_142[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x134CE504, 0x134CE508,
+    0x01,
+    //room spawners:,
+    0x134CE532,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x134CE53C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x134CE552,
+    //2: 01 00 54 00 04 00,
+    0x134CE5D2
+};
+
+int enemy_room_143[] = {
+    //num enemy types: 7, num enemies 16,
+    //0x13751B84, 0x13751B88,
+    0x07,
+    //room spawners:,
+    0x13751BB2,
+    //values: 01 00 4A 00 00 00  //0x4A - Joachim,
+    //0x13751BBC, //+0x0A address,
+    //room spawners:,
+    0x13751BC6,
+    //values: 01 00 72 00 00 00  //0x72 - ???,
+    //0x13751BD0, //+0x0A address,
+    //room spawners:,
+    0x13751BDA,
+    //values: 01 00 73 00 00 00  //0x73 - ???,
+    //0x13751BE4, //+0x0A address,
+    //room spawners:,
+    0x13751BEE,
+    //values: 01 00 74 00 00 00  //0x74 - ???,
+    //0x13751BF8, //+0x0A address,
+    //room spawners:,
+    0x13751C02,
+    //values: 01 00 68 00 00 00  //0x68 - ???,
+    //0x13751C0C, //+0x0A address,
+    //room spawners:,
+    0x13751C16,
+    //values: 01 00 48 00 00 00  //0x48 - ???,
+    //0x13751C20, //+0x0A address,
+    //room spawners:,
+    0x13751C2A,
+    //values: 01 00 5F 00 00 00  //0x5F - ???,
+    //0x13751C34, //+0x0A address,
+    //1: 01 00 4A 00 06 00,
+    0x13751C42,
+    //2: 01 00 5F 00 06 00,
+    0x13751CC2,
+    //3: 01 00 48 00 06 00,
+    0x13751D42,
+    //4: 01 00 68 00 06 00,
+    0x13751DC2,
+    //5: 01 00 68 00 06 00,
+    0x13751E42,
+    //6: 01 00 74 00 06 00,
+    0x13751EC2,
+    //7: 01 00 73 00 06 00,
+    0x13751F42,
+    //8: 01 00 68 00 07 00,
+    0x13751FC2,
+    //9: 01 00 72 00 06 00,
+    0x13752042,
+    //10: 01 00 73 00 06 00,
+    0x137520C2,
+    //11: 01 00 72 00 06 00,
+    0x13752142,
+    //12: 01 00 72 00 06 00,
+    0x137521C2,
+    //13: 01 00 72 00 06 00,
+    0x13752242,
+    //14: 01 00 72 00 06 00,
+    0x137522C2,
+    //15: 01 00 72 00 06 00,
+    0x13752342,
+    //16: 01 00 72 00 06 00,
+    0x137523C2
+};
+
+int enemy_room_144[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x13A63884, 0x13A63888,
+    0x01,
+    //room spawners:,
+    0x13A638B2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x13A638BC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x13A638D2,
+    //2: 01 00 54 00 04 00,
+    0x13A63952
+};
+
+int enemy_room_145[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x13D91C04, 0x13D91C08,
+    0x02,
+    //room spawners:,
+    0x13D91C32,
+    //values: 01 00 16 00 0F 00  //0x16 - Gargoyle,
+    //0x13D91C3C, //+0x0A address,
+    //room spawners:,
+    0x13D91C46,
+    //values: 01 00 70 00 02 00  //0x70 - Poison Lizard,
+    //0x13D91C50, //+0x0A address,
+    //1: 01 00 16 00 06 00,
+    0x13D91C62,
+    //2: 01 00 16 00 06 00,
+    0x13D91CE2,
+    //3: 01 00 16 00 06 00,
+    0x13D91D62,
+    //4: 01 00 16 00 06 00,
+    0x13D91DE2,
+    //5: 01 00 70 00 16 00,
+    0x13D91E62
+};
+
+int enemy_room_146[] = {
+    //num enemy types: 1, num enemies 4,
+    //0x14136304, 0x14136308,
+    0x01,
+    //room spawners:,
+    0x14136332,
+    //values: 01 00 36 00 0F 00  //0x36 - Storm Skeleton,
+    //0x1413633C, //+0x0A address,
+    //1: 01 00 36 00 04 00,
+    0x14136352,
+    //2: 01 00 36 00 04 00,
+    0x141363D2,
+    //3: 01 00 36 00 04 00,
+    0x14136452,
+    //4: 01 00 36 00 04 00,
+    0x141364D2
+};
+
+int enemy_room_147[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x14467A04, 0x14467A08,
+    0x01,
+    //room spawners:,
+    0x14467A32,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x14467A3C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x14467A52,
+    //2: 01 00 54 00 04 00,
+    0x14467AD2
+};
+
+int enemy_room_148[] = {
+    //num enemy types: 4, num enemies 8,
+    //0x145F2984, 0x145F2988,
+    0x04,
+    //room spawners:,
+    0x145F29B2,
+    //values: 01 00 0C 00 0D 00  //0x0C - Skeleton,
+    //0x145F29BC, //+0x0A address,
+    //room spawners:,
+    0x145F29C6,
+    //values: 01 00 67 00 02 00  //0x67 - Spartacus,
+    //0x145F29D0, //+0x0A address,
+    //room spawners:,
+    0x145F29DA,
+    //values: 01 00 20 00 02 00  //0x20 - Axe Knight,
+    //0x145F29E4, //+0x0A address,
+    //room spawners:,
+    0x145F29EE,
+    //values: 01 00 43 00 0F 00  //0x43 - ???,
+    //0x145F29F8, //+0x0A address,
+    //1: 01 00 0C 00 04 00,
+    0x145F2A02,
+    //2: 01 00 0C 00 04 00,
+    0x145F2A82,
+    //3: 01 00 0C 00 04 00,
+    0x145F2B02,
+    //4: 01 00 43 00 04 00,
+    0x145F2B82,
+    //5: 01 00 67 00 04 00,
+    0x145F2C02,
+    //6: 01 00 67 00 04 00,
+    0x145F2C82,
+    //7: 01 00 67 00 04 00,
+    0x145F2D02,
+    //8: 01 00 20 00 04 00,
+    0x145F2D82
+};
+
+int enemy_room_149[] = {
+    //num enemy types: 2, num enemies 2,
+    //0x1477FE04, 0x1477FE08,
+    0x02,
+    //room spawners:,
+    0x1477FE32,
+    //values: 01 00 47 00 0F 00  //0x47 - Ghost,
+    //0x1477FE3C, //+0x0A address,
+    //room spawners:,
+    0x1477FE46,
+    //values: 01 00 6D 00 02 00  //0x6D - Thunder Demon,
+    //0x1477FE50, //+0x0A address,
+    //1: 01 00 47 00 14 00,
+    0x1477FE62,
+    //2: 01 00 6D 00 04 00,
+    0x1477FEE2
+};
+
+int enemy_room_150[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x1491E984, 0x1491E988,
+    0x01,
+    //room spawners:,
+    0x1491E9B2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x1491E9BC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x1491E9D2,
+    //2: 01 00 54 00 04 00,
+    0x1491EA52
+};
+
+int enemy_room_151[] = {
+    //num enemy types: 3, num enemies 5,
+    //0x14AB1104, 0x14AB1108,
+    0x03,
+    //room spawners:,
+    0x14AB1132,
+    //values: 01 00 35 00 0F 00  //0x35 - Evil Stabber,
+    //0x14AB113C, //+0x0A address,
+    //room spawners:,
+    0x14AB1146,
+    //values: 01 00 03 00 0F 00  //0x03 - Red Skeleton,
+    //0x14AB1150, //+0x0A address,
+    //room spawners:,
+    0x14AB115A,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x14AB1164, //+0x0A address,
+    //1: 01 00 35 00 04 00,
+    0x14AB1172,
+    //2: 01 00 03 00 04 00,
+    0x14AB11F2,
+    //3: 01 00 03 00 04 00,
+    0x14AB1272,
+    //4: 01 00 35 00 04 00,
+    0x14AB12F2,
+    //5: 01 00 54 00 04 00,
+    0x14AB1372
+};
+
+int enemy_room_152[] = {
+    //num enemy types: 3, num enemies 8,
+    //0x14E47084, 0x14E47088,
+    0x03,
+    //room spawners:,
+    0x14E470B2,
+    //values: 01 00 0A 00 0F 00  //0x0A - Axe Armor,
+    //0x14E470BC, //+0x0A address,
+    //room spawners:,
+    0x14E470C6,
+    //values: 01 00 35 00 0F 00  //0x35 - Evil Stabber,
+    //0x14E470D0, //+0x0A address,
+    //room spawners:,
+    0x14E470DA,
+    //values: 01 00 71 00 02 00  //0x71 - Lizard Knight,
+    //0x14E470E4, //+0x0A address,
+    //1: 01 00 71 00 06 00,
+    0x14E470F2,
+    //2: 01 00 71 00 06 00,
+    0x14E47172,
+    //3: 01 00 71 00 06 00,
+    0x14E471F2,
+    //4: 01 00 71 00 06 00,
+    0x14E47272,
+    //5: 01 00 71 00 06 00,
+    0x14E472F2,
+    //6: 01 00 0A 00 16 00,
+    0x14E47372,
+    //7: 01 00 35 00 06 00,
+    0x14E473F2,
+    //8: 01 00 35 00 06 00,
+    0x14E47472
+};
+
+int enemy_room_153[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x15174104, 0x15174108,
+    0x02,
+    //room spawners:,
+    0x15174132,
+    //values: 01 00 11 00 0F 00  //0x11 - Skeleton Swordsman,
+    //0x1517413C, //+0x0A address,
+    //room spawners:,
+    0x15174146,
+    //values: 01 00 17 00 0F 00  //0x17 - Skeleton Archer,
+    //0x15174150, //+0x0A address,
+    //1: 01 00 11 00 05 00,
+    0x15174162,
+    //2: 01 00 11 00 05 00,
+    0x151741E2,
+    //3: 01 00 11 00 05 00,
+    0x15174262,
+    //4: 01 00 11 00 05 00,
+    0x151742E2,
+    //5: 01 00 17 00 05 00,
+    0x15174362,
+    //6: 01 00 17 00 05 00,
+    0x151743E2
+};
+
+int enemy_room_154[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x15665484, 0x15665488,
+    0x01,
+    //room spawners:,
+    0x156654B2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x156654BC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x156654D2,
+    //2: 01 00 54 00 04 00,
+    0x15665552
+};
+
+int enemy_room_155[] = {
+    //num enemy types: 3, num enemies 6,
+    //0x1599D184, 0x1599D188,
+    0x03,
+    //room spawners:,
+    0x1599D1B2,
+    //values: 01 00 4C 00 0F 00  //0x4C - Shadow Wolf,
+    //0x1599D1BC, //+0x0A address,
+    //room spawners:,
+    0x1599D1C6,
+    //values: 01 00 47 00 0F 00  //0x47 - Ghost,
+    //0x1599D1D0, //+0x0A address,
+    //room spawners:,
+    0x1599D1DA,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x1599D1E4, //+0x0A address,
+    //1: 01 00 47 00 04 00,
+    0x1599D1F2,
+    //2: 01 00 47 00 04 00,
+    0x1599D272,
+    //3: 01 00 47 00 04 00,
+    0x1599D2F2,
+    //4: 01 00 4C 00 04 00,
+    0x1599D372,
+    //5: 01 00 4C 00 04 00,
+    0x1599D3F2,
+    //6: 01 00 54 00 04 00,
+    0x1599D472
+};
+
+int enemy_room_156[] = {
+    //num enemy types: 3, num enemies 4,
+    //0x15B0D484, 0x15B0D488,
+    0x03,
+    //room spawners:,
+    0x15B0D4B2,
+    //values: 01 00 0C 00 0D 00  //0x0C - Skeleton,
+    //0x15B0D4BC, //+0x0A address,
+    //room spawners:,
+    0x15B0D4C6,
+    //values: 01 00 69 00 02 00  //0x69 - Death Ripper,
+    //0x15B0D4D0, //+0x0A address,
+    //room spawners:,
+    0x15B0D4DA,
+    //values: 01 00 6D 00 02 00  //0x6D - Thunder Demon,
+    //0x15B0D4E4, //+0x0A address,
+    //1: 01 00 0C 00 1C 00,
+    0x15B0D4F2,
+    //2: 01 00 6D 00 04 00,
+    0x15B0D572,
+    //3: 01 00 6D 00 04 00,
+    0x15B0D5F2,
+    //4: 01 00 69 00 14 00,
+    0x15B0D672
+};
+
+int enemy_room_157[] = {
+    //num enemy types: 2, num enemies 9,
+    //0x15C7DB84, 0x15C7DB88,
+    0x02,
+    //room spawners:,
+    0x15C7DBB2,
+    //values: 01 00 11 00 0F 00  //0x11 - Skeleton Swordsman,
+    //0x15C7DBBC, //+0x0A address,
+    //room spawners:,
+    0x15C7DBC6,
+    //values: 01 00 15 00 02 00  //0x15 - Armor Knight,
+    //0x15C7DBD0, //+0x0A address,
+    //1: 01 00 11 00 05 00,
+    0x15C7DBE2,
+    //2: 01 00 11 00 05 00,
+    0x15C7DC62,
+    //3: 01 00 11 00 05 00,
+    0x15C7DCE2,
+    //4: 01 00 11 00 05 00,
+    0x15C7DD62,
+    //5: 01 00 11 00 05 00,
+    0x15C7DDE2,
+    //6: 01 00 11 00 05 00,
+    0x15C7DE62,
+    //7: 01 00 15 00 05 00,
+    0x15C7DEE2,
+    //8: 01 00 15 00 05 00,
+    0x15C7DF62,
+    //9: 01 00 15 00 05 00,
+    0x15C7DFE2
+};
+
+int enemy_room_158[] = {
+    //num enemy types: 2, num enemies 4,
+    //0x15E02D04, 0x15E02D08,
+    0x02,
+    //room spawners:,
+    0x15E02D32,
+    //values: 01 00 47 00 0F 00  //0x47 - Ghost,
+    //0x15E02D3C, //+0x0A address,
+    //room spawners:,
+    0x15E02D46,
+    //values: 01 00 08 00 0F 00  //0x08 - Bat,
+    //0x15E02D50, //+0x0A address,
+    //1: 01 00 47 00 14 00,
+    0x15E02D62,
+    //2: 01 00 08 00 14 00,
+    0x15E02DE2,
+    //3: 01 00 08 00 04 00,
+    0x15E02E62,
+    //4: 01 00 08 00 04 00,
+    0x15E02EE2
+};
+
+int enemy_room_159[] = {
+    //num enemy types: 4, num enemies 8,
+    //0x16342E84, 0x16342E88,
+    0x04,
+    //room spawners:,
+    0x16342EB2,
+    //values: 01 00 67 00 02 00  //0x67 - Spartacus,
+    //0x16342EBC, //+0x0A address,
+    //room spawners:,
+    0x16342EC6,
+    //values: 01 00 35 00 0F 00  //0x35 - Evil Stabber,
+    //0x16342ED0, //+0x0A address,
+    //room spawners:,
+    0x16342EDA,
+    //values: 01 00 0D 00 0D 00  //0x0D - Skeleton Soldier,
+    //0x16342EE4, //+0x0A address,
+    //room spawners:,
+    0x16342EEE,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x16342EF8, //+0x0A address,
+    //1: 01 00 35 00 04 00,
+    0x16342F02,
+    //2: 01 00 0D 00 04 00,
+    0x16342F82,
+    //3: 01 00 0D 00 04 00,
+    0x16343002,
+    //4: 01 00 0D 00 04 00,
+    0x16343082,
+    //5: 01 00 67 00 04 00,
+    0x16343102,
+    //6: 01 00 67 00 04 00,
+    0x16343182,
+    //7: 01 00 67 00 04 00,
+    0x16343202,
+    //8: 01 00 54 00 04 00,
+    0x16343282
+};
+
+int enemy_room_160[] = {
+    //num enemy types: 3, num enemies 5,
+    //0x1653B184, 0x1653B188,
+    0x03,
+    //room spawners:,
+    0x1653B1B2,
+    //values: 01 00 16 00 0F 00  //0x16 - Gargoyle,
+    //0x1653B1BC, //+0x0A address,
+    //room spawners:,
+    0x1653B1C6,
+    //values: 01 00 4C 00 0F 00  //0x4C - Shadow Wolf,
+    //0x1653B1D0, //+0x0A address,
+    //room spawners:,
+    0x1653B1DA,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x1653B1E4, //+0x0A address,
+    //1: 01 00 16 00 04 00,
+    0x1653B1F2,
+    //2: 01 00 4C 00 04 00,
+    0x1653B272,
+    //3: 01 00 4C 00 04 00,
+    0x1653B2F2,
+    //4: 01 00 4C 00 04 00,
+    0x1653B372,
+    //5: 01 00 54 00 04 00,
+    0x1653B3F2
+};
+
+int enemy_room_161[] = {
+    //num enemy types: 3, num enemies 9,
+    //0x166AFB04, 0x166AFB08,
+    0x03,
+    //room spawners:,
+    0x166AFB32,
+    //values: 01 00 3A 00 0F 00  //0x3A - Buckbaird,
+    //0x166AFB3C, //+0x0A address,
+    //room spawners:,
+    0x166AFB46,
+    //values: 01 00 23 00 0F 00  //0x23 - Astral Warrior,
+    //0x166AFB50, //+0x0A address,
+    //room spawners:,
+    0x166AFB5A,
+    //values: 01 00 2E 00 02 00  //0x2E - Dullahan,
+    //0x166AFB64, //+0x0A address,
+    //1: 01 00 3A 00 06 00,
+    0x166AFB72,
+    //2: 01 00 3A 00 06 00,
+    0x166AFBF2,
+    //3: 01 00 23 00 06 00,
+    0x166AFC72,
+    //4: 01 00 23 00 06 00,
+    0x166AFCF2,
+    //5: 01 00 2E 00 06 00,
+    0x166AFD72,
+    //6: 01 00 2E 00 06 00,
+    0x166AFDF2,
+    //7: 01 00 2E 00 06 00,
+    0x166AFE72,
+    //8: 01 00 23 00 06 00,
+    0x166AFEF2,
+    //9: 01 00 23 00 06 00,
+    0x166AFF72
+};
+
+int enemy_room_162[] = {
+    //num enemy types: 2, num enemies 3,
+    //0x16818A84, 0x16818A88,
+    0x02,
+    //room spawners:,
+    0x16818AB2,
+    //values: 01 00 47 00 0F 00  //0x47 - Ghost,
+    //0x16818ABC, //+0x0A address,
+    //room spawners:,
+    0x16818AC6,
+    //values: 01 00 2E 00 02 00  //0x2E - Dullahan,
+    //0x16818AD0, //+0x0A address,
+    //1: 01 00 47 00 14 00,
+    0x16818AE2,
+    //2: 01 00 2E 00 04 00,
+    0x16818B62,
+    //3: 01 00 2E 00 04 00,
+    0x16818BE2
+};
+
+int enemy_room_163[] = {
+    //num enemy types: 1, num enemies 3,
+    //0x16978984, 0x16978988,
+    0x01,
+    //room spawners:,
+    0x169789B2,
+    //values: 01 00 3A 00 0F 00  //0x3A - Buckbaird,
+    //0x169789BC, //+0x0A address,
+    //1: 01 00 3A 00 04 00,
+    0x169789D2,
+    //2: 01 00 3A 00 04 00,
+    0x16978A52,
+    //3: 01 00 3A 00 04 00,
+    0x16978AD2
+};
+
+int enemy_room_164[] = {
+    //num enemy types: 3, num enemies 8,
+    //0x16B71784, 0x16B71788,
+    0x03,
+    //room spawners:,
+    0x16B717B2,
+    //values: 01 00 16 00 0F 00  //0x16 - Gargoyle,
+    //0x16B717BC, //+0x0A address,
+    //room spawners:,
+    0x16B717C6,
+    //values: 01 00 30 00 02 00  //0x30 - Skeleton Hunter,
+    //0x16B717D0, //+0x0A address,
+    //room spawners:,
+    0x16B717DA,
+    //values: 01 00 17 00 0D 00  //0x17 - Skeleton Archer,
+    //0x16B717E4, //+0x0A address,
+    //1: 01 00 16 00 04 00,
+    0x16B717F2,
+    //2: 01 00 17 00 04 00,
+    0x16B71872,
+    //3: 01 00 17 00 04 00,
+    0x16B718F2,
+    //4: 01 00 17 00 04 00,
+    0x16B71972,
+    //5: 01 00 30 00 04 00,
+    0x16B719F2,
+    //6: 01 00 30 00 04 00,
+    0x16B71A72,
+    //7: 01 00 30 00 04 00,
+    0x16B71AF2,
+    //8: 01 00 30 00 04 00,
+    0x16B71B72
+};
+
+int enemy_room_165[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x16F2F104, 0x16F2F108,
+    0x02,
+    //room spawners:,
+    0x16F2F132,
+    //values: 01 00 17 00 0F 00  //0x17 - Skeleton Archer,
+    //0x16F2F13C, //+0x0A address,
+    //room spawners:,
+    0x16F2F146,
+    //values: 01 00 6D 00 0F 00  //0x6D - Thunder Demon,
+    //0x16F2F150, //+0x0A address,
+    //1: 01 00 17 00 04 00,
+    0x16F2F162,
+    //2: 01 00 17 00 04 00,
+    0x16F2F1E2,
+    //3: 01 00 6D 00 04 00,
+    0x16F2F262,
+    //4: 01 00 17 00 04 00,
+    0x16F2F2E2,
+    //5: 01 00 17 00 04 00,
+    0x16F2F362,
+    //6: 01 00 6D 00 04 00,
+    0x16F2F3E2
+};
+
+int enemy_room_166[] = {
+    //num enemy types: 3, num enemies 4,
+    //0x17120004, 0x17120008,
+    0x03,
+    //room spawners:,
+    0x17120032,
+    //values: 01 00 1B 00 0F 00  //0x1B - Man-Eating Plant,
+    //0x1712003C, //+0x0A address,
+    //room spawners:,
+    0x17120046,
+    //values: 01 00 19 00 0F 00  //0x19 - Mist,
+    //0x17120050, //+0x0A address,
+    //room spawners:,
+    0x1712005A,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x17120064, //+0x0A address,
+    //1: 01 00 1B 00 04 00,
+    0x17120072,
+    //2: 01 00 19 00 05 00,
+    0x171200F2,
+    //3: 01 00 19 00 05 00,
+    0x17120172,
+    //4: 01 00 54 00 04 00,
+    0x171201F2
+};
+
+int enemy_room_167[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x172BE184, 0x172BE188,
+    0x01,
+    //room spawners:,
+    0x172BE1B2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x172BE1BC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x172BE1D2,
+    //2: 01 00 54 00 04 00,
+    0x172BE252
+};
+
+int enemy_room_168[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x1745D484, 0x1745D488,
+    0x01,
+    //room spawners:,
+    0x1745D4B2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x1745D4BC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x1745D4D2
+};
+
+int enemy_room_169[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x175BC504, 0x175BC508,
+    0x01,
+    //room spawners:,
+    0x175BC532,
+    //values: 01 00 2F 00 02 00  //0x2F - Phantom,
+    //0x175BC53C, //+0x0A address,
+    //1: 01 00 2F 00 04 00,
+    0x175BC552,
+    //2: 01 00 2F 00 04 00,
+    0x175BC5D2
+};
+
+int enemy_room_170[] = {
+    //num enemy types: 2, num enemies 8,
+    //0x17906B84, 0x17906B88,
+    0x02,
+    //room spawners:,
+    0x17906BB2,
+    //values: 01 00 15 00 0F 00  //0x15 - Armor Knight,
+    //0x17906BBC, //+0x0A address,
+    //room spawners:,
+    0x17906BC6,
+    //values: 01 00 58 00 02 00  //0x58 - Executioner,
+    //0x17906BD0, //+0x0A address,
+    //1: 01 00 15 00 05 00,
+    0x17906BE2,
+    //2: 01 00 15 00 05 00,
+    0x17906C62,
+    //3: 01 00 15 00 05 00,
+    0x17906CE2,
+    //4: 01 00 15 00 05 00,
+    0x17906D62,
+    //5: 01 00 58 00 05 00,
+    0x17906DE2,
+    //6: 01 00 58 00 05 00,
+    0x17906E62,
+    //7: 01 00 58 00 05 00,
+    0x17906EE2,
+    //8: 01 00 58 00 05 00,
+    0x17906F62
+};
+
+int enemy_room_171[] = {
+    //num enemy types: 4, num enemies 12,
+    //0x17B57D04, 0x17B57D08,
+    0x04,
+    //room spawners:,
+    0x17B57D32,
+    //values: 01 00 14 00 0F 00  //0x14 - Skeleton Flower,
+    //0x17B57D3C, //+0x0A address,
+    //room spawners:,
+    0x17B57D46,
+    //values: 01 00 69 00 02 00  //0x69 - Death Ripper,
+    //0x17B57D50, //+0x0A address,
+    //room spawners:,
+    0x17B57D5A,
+    //values: 01 00 70 00 0F 00  //0x70 - Poison Lizard,
+    //0x17B57D64, //+0x0A address,
+    //room spawners:,
+    0x17B57D6E,
+    //values: 01 00 3A 00 0F 00  //0x3A - Buckbaird,
+    //0x17B57D78, //+0x0A address,
+    //1: 01 00 14 00 06 00,
+    0x17B57D82,
+    //2: 01 00 3A 00 06 00,
+    0x17B57E02,
+    //3: 01 00 3A 00 06 00,
+    0x17B57E82,
+    //4: 01 00 3A 00 06 00,
+    0x17B57F02,
+    //5: 01 00 3A 00 06 00,
+    0x17B57F82,
+    //6: 01 00 14 00 06 00,
+    0x17B58002,
+    //7: 01 00 70 00 16 00,
+    0x17B58082,
+    //8: 01 00 14 00 06 00,
+    0x17B58102,
+    //9: 01 00 14 00 06 00,
+    0x17B58182,
+    //10: 01 00 69 00 06 00,
+    0x17B58202,
+    //11: 01 00 69 00 06 00,
+    0x17B58282,
+    //12: 01 00 69 00 06 00,
+    0x17B58302
+};
+
+int enemy_room_172[] = {
+    //num enemy types: 2, num enemies 3,
+    //0x17D3A684, 0x17D3A688,
+    0x02,
+    //room spawners:,
+    0x17D3A6B2,
+    //values: 01 00 14 00 0F 00  //0x14 - Skeleton Flower,
+    //0x17D3A6BC, //+0x0A address,
+    //room spawners:,
+    0x17D3A6C6,
+    //values: 01 00 16 00 0F 00  //0x16 - Gargoyle,
+    //0x17D3A6D0, //+0x0A address,
+    //1: 01 00 14 00 04 00,
+    0x17D3A6E2,
+    //2: 01 00 16 00 04 00,
+    0x17D3A762,
+    //3: 01 00 16 00 04 00,
+    0x17D3A7E2
+};
+
+int enemy_room_173[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x17EC5104, 0x17EC5108,
+    0x02,
+    //room spawners:,
+    0x17EC5132,
+    //values: 01 00 15 00 0F 00  //0x15 - Armor Knight,
+    //0x17EC513C, //+0x0A address,
+    //room spawners:,
+    0x17EC5146,
+    //values: 01 00 47 00 0F 00  //0x47 - Ghost,
+    //0x17EC5150, //+0x0A address,
+    //1: 01 00 15 00 05 00,
+    0x17EC5162,
+    //2: 01 00 15 00 05 00,
+    0x17EC51E2,
+    //3: 01 00 47 00 14 00,
+    0x17EC5262,
+    //4: 01 00 15 00 05 00,
+    0x17EC52E2,
+    //5: 01 00 15 00 05 00,
+    0x17EC5362,
+    //6: 01 00 47 00 14 00,
+    0x17EC53E2
+};
+
+int enemy_room_174[] = {
+    //num enemy types: 2, num enemies 3,
+    //0x180B9204, 0x180B9208,
+    0x02,
+    //room spawners:,
+    0x180B9232,
+    //values: 01 00 1B 00 0F 00  //0x1B - Man-Eating Plant,
+    //0x180B923C, //+0x0A address,
+    //room spawners:,
+    0x180B9246,
+    //values: 01 00 3A 00 0F 00  //0x3A - Buckbaird,
+    //0x180B9250, //+0x0A address,
+    //1: 01 00 1B 00 04 00,
+    0x180B9262,
+    //2: 01 00 3A 00 04 00,
+    0x180B92E2,
+    //3: 01 00 3A 00 04 00,
+    0x180B9362
+};
+
+int enemy_room_175[] = {
+    //num enemy types: 2, num enemies 3,
+    //0x1829AA04, 0x1829AA08,
+    0x02,
+    //room spawners:,
+    0x1829AA32,
+    //values: 01 00 19 00 0F 00  //0x19 - Mist,
+    //0x1829AA3C, //+0x0A address,
+    //room spawners:,
+    0x1829AA46,
+    //values: 01 00 4C 00 0F 00  //0x4C - Shadow Wolf,
+    //0x1829AA50, //+0x0A address,
+    //1: 01 00 19 00 04 00,
+    0x1829AA62,
+    //2: 01 00 4C 00 04 00,
+    0x1829AAE2,
+    //3: 01 00 4C 00 04 00,
+    0x1829AB62
+};
+
+int enemy_room_176[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x18481504, 0x18481508,
+    0x02,
+    //room spawners:,
+    0x18481532,
+    //values: 01 00 70 00 0F 00  //0x70 - Poison Lizard,
+    //0x1848153C, //+0x0A address,
+    //room spawners:,
+    0x18481546,
+    //values: 01 00 6D 00 0F 00  //0x6D - Thunder Demon,
+    //0x18481550, //+0x0A address,
+    //1: 01 00 70 00 04 00,
+    0x18481562,
+    //2: 01 00 70 00 04 00,
+    0x184815E2,
+    //3: 01 00 70 00 04 00,
+    0x18481662,
+    //4: 01 00 6D 00 04 00,
+    0x184816E2,
+    //5: 01 00 70 00 04 00,
+    0x18481762
+};
+
+int enemy_room_177[] = {
+    //num enemy types: 3, num enemies 7,
+    //0x1882FB84, 0x1882FB88,
+    0x03,
+    //room spawners:,
+    0x1882FBB2,
+    //values: 01 00 14 00 0F 00  //0x14 - Skeleton Flower,
+    //0x1882FBBC, //+0x0A address,
+    //room spawners:,
+    0x1882FBC6,
+    //values: 01 00 69 00 02 00  //0x69 - Death Ripper,
+    //0x1882FBD0, //+0x0A address,
+    //room spawners:,
+    0x1882FBDA,
+    //values: 01 00 70 00 0F 00  //0x70 - Poison Lizard,
+    //0x1882FBE4, //+0x0A address,
+    //1: 01 00 14 00 06 00,
+    0x1882FBF2,
+    //2: 01 00 14 00 06 00,
+    0x1882FC72,
+    //3: 01 00 14 00 06 00,
+    0x1882FCF2,
+    //4: 01 00 70 00 06 00,
+    0x1882FD72,
+    //5: 01 00 69 00 06 00,
+    0x1882FDF2,
+    //6: 01 00 69 00 06 00,
+    0x1882FE72,
+    //7: 01 00 69 00 06 00,
+    0x1882FEF2
+};
+
+int enemy_room_178[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x18A1DF04, 0x18A1DF08,
+    0x01,
+    //room spawners:,
+    0x18A1DF32,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x18A1DF3C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x18A1DF52
+};
+
+int enemy_room_179[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x18BAA084, 0x18BAA088,
+    0x02,
+    //room spawners:,
+    0x18BAA0B2,
+    //values: 01 00 0E 00 0F 00  //0x0E - Thunder Sword,
+    //0x18BAA0BC, //+0x0A address,
+    //room spawners:,
+    0x18BAA0C6,
+    //values: 01 00 01 00 0F 00  //0x01 - Spirit,
+    //0x18BAA0D0, //+0x0A address,
+    //1: 01 00 0E 00 05 00,
+    0x18BAA0E2,
+    //2: 01 00 0E 00 05 00,
+    0x18BAA162,
+    //3: 01 00 0E 00 05 00,
+    0x18BAA1E2,
+    //4: 01 00 0E 00 05 00,
+    0x18BAA262,
+    //5: 01 00 01 00 14 00,
+    0x18BAA2E2,
+    //6: 01 00 0E 00 04 00,
+    0x18BAA362
+};
+
+int enemy_room_180[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x18D2EA04, 0x18D2EA08,
+    0x01,
+    //room spawners:,
+    0x18D2EA32,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x18D2EA3C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x18D2EA52,
+    //2: 01 00 54 00 04 00,
+    0x18D2EAD2
+};
+
+int enemy_room_181[] = {
+    //num enemy types: 2, num enemies 2,
+    //0x18EC4004, 0x18EC4008,
+    0x02,
+    //room spawners:,
+    0x18EC4032,
+    //values: 01 00 01 00 0D 00  //0x01 - Spirit,
+    //0x18EC403C, //+0x0A address,
+    //room spawners:,
+    0x18EC4046,
+    //values: 01 00 16 00 02 00  //0x16 - Gargoyle,
+    //0x18EC4050, //+0x0A address,
+    //1: 01 00 01 00 24 00,
+    0x18EC4062,
+    //2: 01 00 16 00 24 00,
+    0x18EC40E2
+};
+
+int enemy_room_182[] = {
+    //num enemy types: 3, num enemies 4,
+    //0x19092204, 0x19092208,
+    0x03,
+    //room spawners:,
+    0x19092232,
+    //values: 01 00 0D 00 0B 00  //0x0D - Skeleton Soldier,
+    //0x1909223C, //+0x0A address,
+    //room spawners:,
+    0x19092246,
+    //values: 01 00 47 00 0F 00  //0x47 - Ghost,
+    //0x19092250, //+0x0A address,
+    //room spawners:,
+    0x1909225A,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x19092264, //+0x0A address,
+    //1: 01 00 47 00 14 00,
+    0x19092272,
+    //2: 01 00 0D 00 04 00,
+    0x190922F2,
+    //3: 01 00 0D 00 04 00,
+    0x19092372,
+    //4: 01 00 54 00 04 00,
+    0x190923F2
+};
+
+int enemy_room_183[] = {
+    //num enemy types: 2, num enemies 4,
+    //0x192A3A04, 0x192A3A08,
+    0x02,
+    //room spawners:,
+    0x192A3A32,
+    //values: 01 00 70 00 0F 00  //0x70 - Poison Lizard,
+    //0x192A3A3C, //+0x0A address,
+    //room spawners:,
+    0x192A3A46,
+    //values: 01 00 47 00 0F 00  //0x47 - Ghost,
+    //0x192A3A50, //+0x0A address,
+    //1: 01 00 70 00 04 00,
+    0x192A3A62,
+    //2: 01 00 70 00 04 00,
+    0x192A3AE2,
+    //3: 01 00 70 00 04 00,
+    0x192A3B62,
+    //4: 01 00 47 00 14 00,
+    0x192A3BE2
+};
+
+int enemy_room_184[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x19442704, 0x19442708,
+    0x01,
+    //room spawners:,
+    0x19442732,
+    //values: 01 00 16 00 0F 00  //0x16 - Gargoyle,
+    //0x1944273C, //+0x0A address,
+    //1: 01 00 16 00 04 00,
+    0x19442752,
+    //2: 01 00 16 00 04 00,
+    0x194427D2
+};
+
+int enemy_room_185[] = {
+    //num enemy types: 2, num enemies 3,
+    //0x195B0684, 0x195B0688,
+    0x02,
+    //room spawners:,
+    0x195B06B2,
+    //values: 01 00 35 00 0F 00  //0x35 - Evil Stabber,
+    //0x195B06BC, //+0x0A address,
+    //room spawners:,
+    0x195B06C6,
+    //values: 01 00 6D 00 0F 00  //0x6D - Thunder Demon,
+    //0x195B06D0, //+0x0A address,
+    //1: 01 00 35 00 04 00,
+    0x195B06E2,
+    //2: 01 00 6D 00 04 00,
+    0x195B0762,
+    //3: 01 00 6D 00 04 00,
+    0x195B07E2
+};
+
+int enemy_room_186[] = {
+    //num enemy types: 1, num enemies 3,
+    //0x1973EA04, 0x1973EA08,
+    0x01,
+    //room spawners:,
+    0x1973EA32,
+    //values: 01 00 0E 00 0F 00  //0x0E - Thunder Sword,
+    //0x1973EA3C, //+0x0A address,
+    //1: 01 00 0E 00 04 00,
+    0x1973EA52,
+    //2: 01 00 0E 00 04 00,
+    0x1973EAD2,
+    //3: 01 00 0E 00 04 00,
+    0x1973EB52
+};
+
+int enemy_room_187[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x198E0B04, 0x198E0B08,
+    0x01,
+    //room spawners:,
+    0x198E0B32,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x198E0B3C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x198E0B52,
+    //2: 01 00 54 00 04 00,
+    0x198E0BD2
+};
+
+int enemy_room_188[] = {
+    //num enemy types: 7, num enemies 15,
+    //0x19ACBD84, 0x19ACBD88,
+    0x07,
+    //room spawners:,
+    0x19ACBDB2,
+    //values: 01 00 68 00 00 00  //0x68 - ???,
+    //0x19ACBDBC, //+0x0A address,
+    //room spawners:,
+    0x19ACBDC6,
+    //values: 01 00 72 00 00 00  //0x72 - ???,
+    //0x19ACBDD0, //+0x0A address,
+    //room spawners:,
+    0x19ACBDDA,
+    //values: 01 00 76 00 00 00  //0x76 - ???,
+    //0x19ACBDE4, //+0x0A address,
+    //room spawners:,
+    0x19ACBDEE,
+    //values: 01 00 73 00 00 00  //0x73 - ???,
+    //0x19ACBDF8, //+0x0A address,
+    //room spawners:,
+    0x19ACBE02,
+    //values: 01 00 74 00 00 00  //0x74 - ???,
+    //0x19ACBE0C, //+0x0A address,
+    //room spawners:,
+    0x19ACBE16,
+    //values: 01 00 4D 00 00 00  //0x4D - ???,
+    //0x19ACBE20, //+0x0A address,
+    //room spawners:,
+    0x19ACBE2A,
+    //values: 01 00 32 00 00 00  //0x32 - Medusa,
+    //0x19ACBE34, //+0x0A address,
+    //1: 01 00 68 00 06 00,
+    0x19ACBE42,
+    //2: 01 00 32 00 06 00,
+    0x19ACBEC2,
+    //3: 01 00 4D 00 06 00,
+    0x19ACBF42,
+    //4: 01 00 68 00 06 00,
+    0x19ACBFC2,
+    //5: 01 00 76 00 0C 00,
+    0x19ACC042,
+    //6: 01 00 74 00 06 00,
+    0x19ACC0C2,
+    //7: 01 00 73 00 06 00,
+    0x19ACC142,
+    //8: 01 00 72 00 06 00,
+    0x19ACC1C2,
+    //9: 01 00 73 00 06 00,
+    0x19ACC242,
+    //10: 01 00 72 00 06 00,
+    0x19ACC2C2,
+    //11: 01 00 72 00 06 00,
+    0x19ACC342,
+    //12: 01 00 72 00 06 00,
+    0x19ACC3C2,
+    //13: 01 00 72 00 06 00,
+    0x19ACC442,
+    //14: 01 00 72 00 06 00,
+    0x19ACC4C2,
+    //15: 01 00 72 00 06 00,
+    0x19ACC542
+};
+
+int enemy_room_189[] = {
+    //num enemy types: 2, num enemies 3,
+    //0x1A160604, 0x1A160608,
+    0x02,
+    //room spawners:,
+    0x1A160632,
+    //values: 01 00 20 00 00 00  //0x20 - Axe Knight,
+    //0x1A16063C, //+0x0A address,
+    //room spawners:,
+    0x1A160646,
+    //values: 01 00 70 00 00 00  //0x70 - Poison Lizard,
+    //0x1A160650, //+0x0A address,
+    //1: 01 00 20 00 04 00,
+    0x1A160662,
+    //2: 01 00 70 00 04 00,
+    0x1A1606E2,
+    //3: 01 00 70 00 04 00,
+    0x1A160762
+};
+
+int enemy_room_190[] = {
+    //num enemy types: 4, num enemies 11,
+    //0x1A2A6804, 0x1A2A6808,
+    0x04,
+    //room spawners:,
+    0x1A2A6832,
+    //values: 01 00 63 00 00 00  //0x63 - Thunder Elemental,
+    //0x1A2A683C, //+0x0A address,
+    //room spawners:,
+    0x1A2A6846,
+    //values: 01 00 73 00 00 00  //0x73 - ???,
+    //0x1A2A6850, //+0x0A address,
+    //room spawners:,
+    0x1A2A685A,
+    //values: 01 00 72 00 00 00  //0x72 - ???,
+    //0x1A2A6864, //+0x0A address,
+    //room spawners:,
+    0x1A2A686E,
+    //values: 01 00 74 00 00 00  //0x74 - ???,
+    //0x1A2A6878, //+0x0A address,
+    //1: 01 00 63 00 06 00,
+    0x1A2A6882,
+    //2: 01 00 74 00 06 00,
+    0x1A2A6902,
+    //3: 01 00 72 00 06 00,
+    0x1A2A6982,
+    //4: 01 00 73 00 06 00,
+    0x1A2A6A02,
+    //5: 01 00 72 00 06 00,
+    0x1A2A6A82,
+    //6: 01 00 72 00 06 00,
+    0x1A2A6B02,
+    //7: 01 00 63 00 06 00,
+    0x1A2A6B82,
+    //8: 01 00 72 00 06 00,
+    0x1A2A6C02,
+    //9: 01 00 72 00 06 00,
+    0x1A2A6C82,
+    //10: 01 00 72 00 06 00,
+    0x1A2A6D02,
+    //11: 01 00 72 00 06 00,
+    0x1A2A6D82
+};
+
+int enemy_room_191[] = {
+    //num enemy types: 2, num enemies 3,
+    //0x1A4D9B04, 0x1A4D9B08,
+    0x02,
+    //room spawners:,
+    0x1A4D9B32,
+    //values: 01 00 44 00 00 00  //0x44 - ???,
+    //0x1A4D9B3C, //+0x0A address,
+    //room spawners:,
+    0x1A4D9B46,
+    //values: 01 00 68 00 00 00  //0x68 - ???,
+    //0x1A4D9B50, //+0x0A address,
+    //1: 01 00 68 00 07 00,
+    0x1A4D9B62,
+    //2: 01 00 68 00 07 00,
+    0x1A4D9BE2,
+    //3: 01 00 44 00 06 00,
+    0x1A4D9C62
+};
+
+int enemy_room_192[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x1A82A904, 0x1A82A908,
+    0x02,
+    //room spawners:,
+    0x1A82A932,
+    //values: 01 00 67 00 0F 00  //0x67 - Spartacus,
+    //0x1A82A93C, //+0x0A address,
+    //room spawners:,
+    0x1A82A946,
+    //values: 01 00 34 00 02 00  //0x34 - Gaap,
+    //0x1A82A950, //+0x0A address,
+    //1: 01 00 67 00 04 00,
+    0x1A82A962,
+    //2: 01 00 67 00 04 00,
+    0x1A82A9E2,
+    //3: 01 00 34 00 04 00,
+    0x1A82AA62,
+    //4: 01 00 67 00 04 00,
+    0x1A82AAE2,
+    //5: 01 00 67 00 04 00,
+    0x1A82AB62
+};
+
+int enemy_room_193[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x1A9D8684, 0x1A9D8688,
+    0x02,
+    //room spawners:,
+    0x1A9D86B2,
+    //values: 01 00 34 00 0F 00  //0x34 - Gaap,
+    //0x1A9D86BC, //+0x0A address,
+    //room spawners:,
+    0x1A9D86C6,
+    //values: 01 00 13 00 0F 00  //0x13 - Chaos Sword,
+    //0x1A9D86D0, //+0x0A address,
+    //1: 01 00 34 00 05 00,
+    0x1A9D86E2,
+    //2: 01 00 34 00 05 00,
+    0x1A9D8762,
+    //3: 01 00 13 00 04 00,
+    0x1A9D87E2,
+    //4: 01 00 13 00 04 00,
+    0x1A9D8862,
+    //5: 01 00 13 00 04 00,
+    0x1A9D88E2,
+    //6: 01 00 13 00 04 00,
+    0x1A9D8962
+};
+
+int enemy_room_194[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x1AB64D84, 0x1AB64D88,
+    0x02,
+    //room spawners:,
+    0x1AB64DB2,
+    //values: 01 00 69 00 0F 00  //0x69 - Death Ripper,
+    //0x1AB64DBC, //+0x0A address,
+    //room spawners:,
+    0x1AB64DC6,
+    //values: 01 00 13 00 0F 00  //0x13 - Chaos Sword,
+    //0x1AB64DD0, //+0x0A address,
+    //1: 01 00 69 00 04 00,
+    0x1AB64DE2,
+    //2: 01 00 69 00 04 00,
+    0x1AB64E62,
+    //3: 01 00 69 00 04 00,
+    0x1AB64EE2,
+    //4: 01 00 13 00 04 00,
+    0x1AB64F62,
+    //5: 01 00 13 00 04 00,
+    0x1AB64FE2
+};
+
+int enemy_room_195[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x1B1EDE84, 0x1B1EDE88,
+    0x02,
+    //room spawners:,
+    0x1B1EDEB2,
+    //values: 01 00 57 00 0F 00  //0x57 - Red Ogre,
+    //0x1B1EDEBC, //+0x0A address,
+    //room spawners:,
+    0x1B1EDEC6,
+    //values: 01 00 69 00 02 00  //0x69 - Death Ripper,
+    //0x1B1EDED0, //+0x0A address,
+    //1: 01 00 57 00 04 00,
+    0x1B1EDEE2,
+    //2: 01 00 57 00 04 00,
+    0x1B1EDF62,
+    //3: 01 00 69 00 04 00,
+    0x1B1EDFE2,
+    //4: 01 00 69 00 04 00,
+    0x1B1EE062,
+    //5: 01 00 57 00 04 00,
+    0x1B1EE0E2,
+    //6: 01 00 69 00 04 00,
+    0x1B1EE162
+};
+
+int enemy_room_196[] = {
+    //num enemy types: 2, num enemies 12,
+    //0x1B38EF84, 0x1B38EF88,
+    0x02,
+    //room spawners:,
+    0x1B38EFB2,
+    //values: 01 00 57 00 0F 00  //0x57 - Red Ogre,
+    //0x1B38EFBC, //+0x0A address,
+    //room spawners:,
+    0x1B38EFC6,
+    //values: 01 00 2E 00 0F 00  //0x2E - Dullahan,
+    //0x1B38EFD0, //+0x0A address,
+    //1: 01 00 57 00 05 00,
+    0x1B38EFE2,
+    //2: 01 00 57 00 05 00,
+    0x1B38F062,
+    //3: 01 00 57 00 05 00,
+    0x1B38F0E2,
+    //4: 01 00 57 00 05 00,
+    0x1B38F162,
+    //5: 01 00 2E 00 05 00,
+    0x1B38F1E2,
+    //6: 01 00 2E 00 04 00,
+    0x1B38F262,
+    //7: 01 00 2E 00 05 00,
+    0x1B38F2E2,
+    //8: 01 00 2E 00 04 00,
+    0x1B38F362,
+    //9: 01 00 2E 00 05 00,
+    0x1B38F3E2,
+    //10: 01 00 2E 00 04 00,
+    0x1B38F462,
+    //11: 01 00 2E 00 05 00,
+    0x1B38F4E2,
+    //12: 01 00 2E 00 04 00,
+    0x1B38F562
+};
+
+int enemy_room_197[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x1B52F184, 0x1B52F188,
+    0x02,
+    //room spawners:,
+    0x1B52F1B2,
+    //values: 01 00 34 00 0F 00  //0x34 - Gaap,
+    //0x1B52F1BC, //+0x0A address,
+    //room spawners:,
+    0x1B52F1C6,
+    //values: 01 00 71 00 0F 00  //0x71 - Lizard Knight,
+    //0x1B52F1D0, //+0x0A address,
+    //1: 01 00 34 00 04 00,
+    0x1B52F1E2,
+    //2: 01 00 71 00 04 00,
+    0x1B52F262,
+    //3: 01 00 71 00 04 00,
+    0x1B52F2E2,
+    //4: 01 00 71 00 04 00,
+    0x1B52F362,
+    //5: 01 00 71 00 04 00,
+    0x1B52F3E2
+};
+
+int enemy_room_198[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x1B69D604, 0x1B69D608,
+    0x01,
+    //room spawners:,
+    0x1B69D632,
+    //values: 01 00 16 00 00 00  //0x16 - Gargoyle,
+    //0x1B69D63C, //+0x0A address,
+    //1: 01 00 16 00 04 00,
+    0x1B69D652
+};
+
+int enemy_room_199[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x1B815084, 0x1B815088,
+    0x02,
+    //room spawners:,
+    0x1B8150B2,
+    //values: 01 00 6A 00 0F 00  //0x6A - Flame Demon,
+    //0x1B8150BC, //+0x0A address,
+    //room spawners:,
+    0x1B8150C6,
+    //values: 01 00 20 00 0F 00  //0x20 - Axe Knight,
+    //0x1B8150D0, //+0x0A address,
+    //1: 01 00 6A 00 04 00,
+    0x1B8150E2,
+    //2: 01 00 20 00 04 00,
+    0x1B815162,
+    //3: 01 00 20 00 04 00,
+    0x1B8151E2,
+    //4: 01 00 20 00 04 00,
+    0x1B815262,
+    //5: 01 00 20 00 04 00,
+    0x1B8152E2
+};
+
+int enemy_room_200[] = {
+    //num enemy types: 3, num enemies 8,
+    //0x1BB3EB04, 0x1BB3EB08,
+    0x03,
+    //room spawners:,
+    0x1BB3EB32,
+    //values: 01 00 67 00 0F 00  //0x67 - Spartacus,
+    //0x1BB3EB3C, //+0x0A address,
+    //room spawners:,
+    0x1BB3EB46,
+    //values: 01 00 13 00 0F 00  //0x13 - Chaos Sword,
+    //0x1BB3EB50, //+0x0A address,
+    //room spawners:,
+    0x1BB3EB5A,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x1BB3EB64, //+0x0A address,
+    //1: 01 00 67 00 04 00,
+    0x1BB3EB72,
+    //2: 01 00 67 00 04 00,
+    0x1BB3EBF2,
+    //3: 01 00 67 00 04 00,
+    0x1BB3EC72,
+    //4: 01 00 13 00 04 00,
+    0x1BB3ECF2,
+    //5: 01 00 13 00 04 00,
+    0x1BB3ED72,
+    //6: 01 00 13 00 04 00,
+    0x1BB3EDF2,
+    //7: 01 00 13 00 04 00,
+    0x1BB3EE72,
+    //8: 01 00 4B 00 06 00,
+    0x1BB3EEF2
+};
+
+int enemy_room_201[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x1BCAC184, 0x1BCAC188,
+    0x01,
+    //room spawners:,
+    0x1BCAC1B2,
+    //values: 01 00 16 00 00 00  //0x16 - Gargoyle,
+    //0x1BCAC1BC, //+0x0A address,
+    //1: 01 00 16 00 04 00,
+    0x1BCAC1D2
+};
+
+int enemy_room_202[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x1BE24204, 0x1BE24208,
+    0x02,
+    //room spawners:,
+    0x1BE24232,
+    //values: 01 00 34 00 0F 00  //0x34 - Gaap,
+    //0x1BE2423C, //+0x0A address,
+    //room spawners:,
+    0x1BE24246,
+    //values: 01 00 69 00 0F 00  //0x69 - Death Ripper,
+    //0x1BE24250, //+0x0A address,
+    //1: 01 00 34 00 04 00,
+    0x1BE24262,
+    //2: 01 00 34 00 04 00,
+    0x1BE242E2,
+    //3: 01 00 69 00 04 00,
+    0x1BE24362,
+    //4: 01 00 69 00 04 00,
+    0x1BE243E2,
+    //5: 01 00 69 00 04 00,
+    0x1BE24462,
+    //6: 01 00 69 00 04 00,
+    0x1BE244E2
+};
+
+int enemy_room_203[] = {
+    //num enemy types: 2, num enemies 7,
+    //0x1C15B384, 0x1C15B388,
+    0x02,
+    //room spawners:,
+    0x1C15B3B2,
+    //values: 01 00 57 00 0F 00  //0x57 - Red Ogre,
+    //0x1C15B3BC, //+0x0A address,
+    //room spawners:,
+    0x1C15B3C6,
+    //values: 01 00 67 00 0F 00  //0x67 - Spartacus,
+    //0x1C15B3D0, //+0x0A address,
+    //1: 01 00 57 00 04 00,
+    0x1C15B3E2,
+    //2: 01 00 57 00 04 00,
+    0x1C15B462,
+    //3: 01 00 57 00 04 00,
+    0x1C15B4E2,
+    //4: 01 00 67 00 04 00,
+    0x1C15B562,
+    //5: 01 00 67 00 04 00,
+    0x1C15B5E2,
+    //6: 01 00 57 00 04 00,
+    0x1C15B662,
+    //7: 01 00 57 00 04 00,
+    0x1C15B6E2
+};
+
+int enemy_room_204[] = {
+    //num enemy types: 4, num enemies 11,
+    //0x1C6B9404, 0x1C6B9408,
+    0x04,
+    //room spawners:,
+    0x1C6B9432,
+    //values: 01 00 59 00 0F 00  //0x59 - Doppleganger,
+    //0x1C6B943C, //+0x0A address,
+    //room spawners:,
+    0x1C6B9446,
+    //values: 01 00 54 00 0B 00  //0x54 - ???,
+    //0x1C6B9450, //+0x0A address,
+    //room spawners:,
+    0x1C6B945A,
+    //values: 01 00 73 00 0F 00  //0x73 - ???,
+    //0x1C6B9464, //+0x0A address,
+    //room spawners:,
+    0x1C6B946E,
+    //values: 01 00 72 00 0F 00  //0x72 - ???,
+    //0x1C6B9478, //+0x0A address,
+    //1: 01 00 59 00 06 00,
+    0x1C6B9482,
+    //2: 01 00 54 00 06 00,
+    0x1C6B9502,
+    //3: 01 00 72 00 06 00,
+    0x1C6B9582,
+    //4: 01 00 73 00 06 00,
+    0x1C6B9602,
+    //5: 01 00 72 00 06 00,
+    0x1C6B9682,
+    //6: 01 00 72 00 06 00,
+    0x1C6B9702,
+    //7: 01 00 59 00 06 00,
+    0x1C6B9782,
+    //8: 01 00 72 00 06 00,
+    0x1C6B9802,
+    //9: 01 00 72 00 06 00,
+    0x1C6B9882,
+    //10: 01 00 72 00 06 00,
+    0x1C6B9902,
+    //11: 01 00 72 00 06 00,
+    0x1C6B9982
+};
+
+int enemy_room_205[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x1C875E84, 0x1C875E88,
+    0x01,
+    //room spawners:,
+    0x1C875EB2,
+    //values: 01 00 2F 00 0F 00  //0x2F - Phantom,
+    //0x1C875EBC, //+0x0A address,
+    //1: 01 00 2F 00 04 00,
+    0x1C875ED2,
+    //2: 01 00 2F 00 04 00,
+    0x1C875F52
+};
+
+int enemy_room_206[] = {
+    //num enemy types: 2, num enemies 7,
+    //0x1C9FC704, 0x1C9FC708,
+    0x02,
+    //room spawners:,
+    0x1C9FC732,
+    //values: 01 00 5D 00 0F 00  //0x5D - Mirage Skeleton,
+    //0x1C9FC73C, //+0x0A address,
+    //room spawners:,
+    0x1C9FC746,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x1C9FC750, //+0x0A address,
+    //1: 01 00 5D 00 04 00,
+    0x1C9FC762,
+    //2: 01 00 5D 00 04 00,
+    0x1C9FC7E2,
+    //3: 01 00 5D 00 04 00,
+    0x1C9FC862,
+    //4: 01 00 5D 00 04 00,
+    0x1C9FC8E2,
+    //5: 01 00 5D 00 04 00,
+    0x1C9FC962,
+    //6: 01 00 5D 00 04 00,
+    0x1C9FC9E2,
+    //7: 01 00 4B 00 06 00,
+    0x1C9FCA62
+};
+
+int enemy_room_207[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x1CB9AB84, 0x1CB9AB88,
+    0x02,
+    //room spawners:,
+    0x1CB9ABB2,
+    //values: 01 00 2F 00 0F 00  //0x2F - Phantom,
+    //0x1CB9ABBC, //+0x0A address,
+    //room spawners:,
+    0x1CB9ABC6,
+    //values: 01 00 69 00 0F 00  //0x69 - Death Ripper,
+    //0x1CB9ABD0, //+0x0A address,
+    //1: 01 00 2F 00 04 00,
+    0x1CB9ABE2,
+    //2: 01 00 69 00 04 00,
+    0x1CB9AC62,
+    //3: 01 00 69 00 04 00,
+    0x1CB9ACE2,
+    //4: 01 00 69 00 04 00,
+    0x1CB9AD62,
+    //5: 01 00 69 00 04 00,
+    0x1CB9ADE2
+};
+
+int enemy_room_208[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x1CD36984, 0x1CD36988,
+    0x02,
+    //room spawners:,
+    0x1CD369B2,
+    //values: 01 00 2F 00 0F 00  //0x2F - Phantom,
+    //0x1CD369BC, //+0x0A address,
+    //room spawners:,
+    0x1CD369C6,
+    //values: 01 00 71 00 0F 00  //0x71 - Lizard Knight,
+    //0x1CD369D0, //+0x0A address,
+    //1: 01 00 2F 00 04 00,
+    0x1CD369E2,
+    //2: 01 00 71 00 04 00,
+    0x1CD36A62,
+    //3: 01 00 71 00 04 00,
+    0x1CD36AE2,
+    //4: 01 00 71 00 04 00,
+    0x1CD36B62,
+    //5: 01 00 71 00 04 00,
+    0x1CD36BE2
+};
+
+int enemy_room_209[] = {
+    //num enemy types: 1, num enemies 6,
+    //0x1CEEAC84, 0x1CEEAC88,
+    0x01,
+    //room spawners:,
+    0x1CEEACB2,
+    //values: 01 00 69 00 0F 00  //0x69 - Death Ripper,
+    //0x1CEEACBC, //+0x0A address,
+    //1: 01 00 69 00 04 00,
+    0x1CEEACD2,
+    //2: 01 00 69 00 04 00,
+    0x1CEEAD52,
+    //3: 01 00 69 00 04 00,
+    0x1CEEADD2,
+    //4: 01 00 69 00 04 00,
+    0x1CEEAE52,
+    //5: 01 00 69 00 14 00,
+    0x1CEEAED2,
+    //6: 01 00 69 00 14 00,
+    0x1CEEAF52
+};
+
+int enemy_room_210[] = {
+    //num enemy types: 2, num enemies 2,
+    //0x1D08E484, 0x1D08E488,
+    0x02,
+    //room spawners:,
+    0x1D08E4B2,
+    //values: 01 00 34 00 0F 00  //0x34 - Gaap,
+    //0x1D08E4BC, //+0x0A address,
+    //room spawners:,
+    0x1D08E4C6,
+    //values: 01 00 16 00 0F 00  //0x16 - Gargoyle,
+    //0x1D08E4D0, //+0x0A address,
+    //1: 01 00 34 00 04 00,
+    0x1D08E4E2,
+    //2: 01 00 16 00 04 00,
+    0x1D08E562
+};
+
+int enemy_room_211[] = {
+    //num enemy types: 2, num enemies 3,
+    //0x1D231B84, 0x1D231B88,
+    0x02,
+    //room spawners:,
+    0x1D231BB2,
+    //values: 01 00 58 00 0F 00  //0x58 - Executioner,
+    //0x1D231BBC, //+0x0A address,
+    //room spawners:,
+    0x1D231BC6,
+    //values: 01 00 57 00 02 00  //0x57 - Red Ogre,
+    //0x1D231BD0, //+0x0A address,
+    //1: 01 00 58 00 04 00,
+    0x1D231BE2,
+    //2: 01 00 58 00 04 00,
+    0x1D231C62,
+    //3: 01 00 57 00 04 00,
+    0x1D231CE2
+};
+
+int enemy_room_212[] = {
+    //num enemy types: 1, num enemies 4,
+    //0x1D3D5504, 0x1D3D5508,
+    0x01,
+    //room spawners:,
+    0x1D3D5532,
+    //values: 01 00 71 00 0F 00  //0x71 - Lizard Knight,
+    //0x1D3D553C, //+0x0A address,
+    //1: 01 00 71 00 04 00,
+    0x1D3D5552,
+    //2: 01 00 71 00 04 00,
+    0x1D3D55D2,
+    //3: 01 00 71 00 04 00,
+    0x1D3D5652,
+    //4: 01 00 71 00 14 00,
+    0x1D3D56D2
+};
+
+int enemy_room_213[] = {
+    //num enemy types: 2, num enemies 4,
+    //0x1D578B84, 0x1D578B88,
+    0x02,
+    //room spawners:,
+    0x1D578BB2,
+    //values: 01 00 71 00 02 00  //0x71 - Lizard Knight,
+    //0x1D578BBC, //+0x0A address,
+    //room spawners:,
+    0x1D578BC6,
+    //values: 01 00 65 00 0F 00  //0x65 - Hanged Man,
+    //0x1D578BD0, //+0x0A address,
+    //1: 01 00 65 00 14 00,
+    0x1D578BE2,
+    //2: 01 00 65 00 14 00,
+    0x1D578C62,
+    //3: 01 00 71 00 04 00,
+    0x1D578CE2,
+    //4: 01 00 71 00 04 00,
+    0x1D578D62
+};
+
+int enemy_room_214[] = {
+    //num enemy types: 1, num enemies 4,
+    //0x1D71C104, 0x1D71C108,
+    0x01,
+    //room spawners:,
+    0x1D71C132,
+    //values: 01 00 67 00 0F 00  //0x67 - Spartacus,
+    //0x1D71C13C, //+0x0A address,
+    //1: 01 00 67 00 04 00,
+    0x1D71C152,
+    //2: 01 00 67 00 04 00,
+    0x1D71C1D2,
+    //3: 01 00 67 00 04 00,
+    0x1D71C252,
+    //4: 01 00 67 00 14 00,
+    0x1D71C2D2
+};
+
+int enemy_room_215[] = {
+    //num enemy types: 2, num enemies 4,
+    //0x1D8BF804, 0x1D8BF808,
+    0x02,
+    //room spawners:,
+    0x1D8BF832,
+    //values: 01 00 2E 00 0F 00  //0x2E - Dullahan,
+    //0x1D8BF83C, //+0x0A address,
+    //room spawners:,
+    0x1D8BF846,
+    //values: 01 00 20 00 02 00  //0x20 - Axe Knight,
+    //0x1D8BF850, //+0x0A address,
+    //1: 01 00 2E 00 04 00,
+    0x1D8BF862,
+    //2: 01 00 2E 00 04 00,
+    0x1D8BF8E2,
+    //3: 01 00 2E 00 04 00,
+    0x1D8BF962,
+    //4: 01 00 20 00 14 00,
+    0x1D8BF9E2
+};
+
+int enemy_room_216[] = {
+    //num enemy types: 2, num enemies 3,
+    //0x1DA62A84, 0x1DA62A88,
+    0x02,
+    //room spawners:,
+    0x1DA62AB2,
+    //values: 01 00 65 00 02 00  //0x65 - Hanged Man,
+    //0x1DA62ABC, //+0x0A address,
+    //room spawners:,
+    0x1DA62AC6,
+    //values: 01 00 6C 00 0F 00  //0x6C - Lesser Demon,
+    //0x1DA62AD0, //+0x0A address,
+    //1: 01 00 6C 00 04 00,
+    0x1DA62AE2,
+    //2: 01 00 6C 00 04 00,
+    0x1DA62B62,
+    //3: 01 00 65 00 14 00,
+    0x1DA62BE2
+};
+
+int enemy_room_217[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x1DE6CB04, 0x1DE6CB08,
+    0x01,
+    //room spawners:,
+    0x1DE6CB32,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x1DE6CB3C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x1DE6CB52
+};
+
+int enemy_room_218[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x1E1DDA04, 0x1E1DDA08,
+    0x01,
+    //room spawners:,
+    0x1E1DDA32,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x1E1DDA3C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x1E1DDA52,
+    //2: 01 00 54 00 04 00,
+    0x1E1DDAD2
+};
+
+int enemy_room_219[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x1E371104, 0x1E371108,
+    0x01,
+    //room spawners:,
+    0x1E371132,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x1E37113C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x1E371152,
+    //2: 01 00 54 00 04 00,
+    0x1E3711D2
+};
+
+int enemy_room_220[] = {
+    //num enemy types: 2, num enemies 4,
+    //0x1E66EF04, 0x1E66EF08,
+    0x02,
+    //room spawners:,
+    0x1E66EF32,
+    //values: 01 00 68 00 00 00  //0x68 - ???,
+    //0x1E66EF3C, //+0x0A address,
+    //room spawners:,
+    0x1E66EF46,
+    //values: 01 00 51 00 00 00  //0x51 - Death,
+    //0x1E66EF50, //+0x0A address,
+    //1: 01 00 51 00 06 00,
+    0x1E66EF62,
+    //2: 01 00 68 00 06 00,
+    0x1E66EFE2,
+    //3: 01 00 68 00 06 00,
+    0x1E66F062,
+    //4: 01 00 68 00 06 00,
+    0x1E66F0E2
+};
+
+int enemy_room_221[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x1EAE6B04, 0x1EAE6B08,
+    0x01,
+    //room spawners:,
+    0x1EAE6B32,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x1EAE6B3C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x1EAE6B52
+};
+
+int enemy_room_222[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x1EC79B84, 0x1EC79B88,
+    0x01,
+    //room spawners:,
+    0x1EC79BB2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x1EC79BBC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x1EC79BD2,
+    //2: 01 00 54 00 04 00,
+    0x1EC79C52
+};
+
+int enemy_room_223[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x1EDC0B84, 0x1EDC0B88,
+    0x01,
+    //room spawners:,
+    0x1EDC0BB2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x1EDC0BBC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x1EDC0BD2
+};
+
+int enemy_room_224[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x1EF44104, 0x1EF44108,
+    0x01,
+    //room spawners:,
+    0x1EF44132,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x1EF4413C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x1EF44152,
+    //2: 01 00 54 00 04 00,
+    0x1EF441D2
+};
+
+int enemy_room_225[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x1F173184, 0x1F173188,
+    0x02,
+    //room spawners:,
+    0x1F1731B2,
+    //values: 01 00 68 00 00 00  //0x68 - ???,
+    //0x1F1731BC, //+0x0A address,
+    //room spawners:,
+    0x1F1731C6,
+    //values: 01 00 52 00 00 00  //0x52 - Walter,
+    //0x1F1731D0, //+0x0A address,
+    //1: 01 00 68 00 06 00,
+    0x1F1731E2,
+    //2: 01 00 52 00 06 00,
+    0x1F173262,
+    //3: 01 00 68 00 06 00,
+    0x1F1732E2,
+    //4: 01 00 52 00 06 00,
+    0x1F173362,
+    //5: 01 00 68 00 06 00,
+    0x1F1733E2
+};
+
+int enemy_room_226[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x1F5D0B84, 0x1F5D0B88,
+    0x01,
+    //room spawners:,
+    0x1F5D0BB2,
+    //values: 01 00 45 00 0F 00  //0x45 - ???,
+    //0x1F5D0BBC, //+0x0A address,
+    //1: 01 00 45 00 04 00,
+    0x1F5D0BD2
+};
+
+int enemy_room_227[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x1F776C04, 0x1F776C08,
+    0x01,
+    //room spawners:,
+    0x1F776C32,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x1F776C3C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x1F776C52
+};
+
+int enemy_room_228[] = {
+    //num enemy types: 5, num enemies 11,
+    //0x1F8E4604, 0x1F8E4608,
+    0x05,
+    //room spawners:,
+    0x1F8E4632,
+    //values: 01 00 2D 00 0F 00  //0x2D - Forgotten One,
+    //0x1F8E463C, //+0x0A address,
+    //room spawners:,
+    0x1F8E4646,
+    //values: 01 00 73 00 0F 00  //0x73 - ???,
+    //0x1F8E4650, //+0x0A address,
+    //room spawners:,
+    0x1F8E465A,
+    //values: 01 00 72 00 0F 00  //0x72 - ???,
+    //0x1F8E4664, //+0x0A address,
+    //room spawners:,
+    0x1F8E466E,
+    //values: 01 00 74 00 0F 00  //0x74 - ???,
+    //0x1F8E4678, //+0x0A address,
+    //room spawners:,
+    0x1F8E4682,
+    //values: 01 00 2C 00 0F 00  //0x2C - Maggot,
+    //0x1F8E468C, //+0x0A address,
+    //1: 01 00 2D 00 06 00,
+    0x1F8E46A2,
+    //2: 01 00 2C 00 04 00,
+    0x1F8E4722,
+    //3: 01 00 74 00 06 00,
+    0x1F8E47A2,
+    //4: 01 00 72 00 06 00,
+    0x1F8E4822,
+    //5: 01 00 73 00 06 00,
+    0x1F8E48A2,
+    //6: 01 00 72 00 06 00,
+    0x1F8E4922,
+    //7: 01 00 72 00 06 00,
+    0x1F8E49A2,
+    //8: 01 00 72 00 06 00,
+    0x1F8E4A22,
+    //9: 01 00 72 00 06 00,
+    0x1F8E4AA2,
+    //10: 01 00 72 00 06 00,
+    0x1F8E4B22,
+    //11: 01 00 72 00 06 00,
+    0x1F8E4BA2
+};
+
+int enemy_room_229[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x1FAE0C84, 0x1FAE0C88,
+    0x01,
+    //room spawners:,
+    0x1FAE0CB2,
+    //values: 01 00 3F 00 00 00  //0x3F - ???,
+    //0x1FAE0CBC, //+0x0A address,
+    //1: 01 00 3F 00 04 00,
+    0x1FAE0CD2
+};
+
+int enemy_room_230[] = {
+    //num enemy types: 3, num enemies 4,
+    //0x2002CE04, 0x2002CE08,
+    0x03,
+    //room spawners:,
+    0x2002CE32,
+    //values: 01 00 73 00 0F 00  //0x73 - ???,
+    //0x2002CE3C, //+0x0A address,
+    //room spawners:,
+    0x2002CE46,
+    //values: 01 00 72 00 0F 00  //0x72 - ???,
+    //0x2002CE50, //+0x0A address,
+    //room spawners:,
+    0x2002CE5A,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x2002CE64, //+0x0A address,
+    //1: 01 00 73 00 24 00,
+    0x2002CE72,
+    //2: 01 00 72 00 24 00,
+    0x2002CEF2,
+    //3: 01 00 54 00 04 00,
+    0x2002CF72,
+    //4: 01 00 54 00 04 00,
+    0x2002CFF2
+};
+
+int enemy_room_231[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x20259A04, 0x20259A08,
+    0x01,
+    //room spawners:,
+    0x20259A32,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x20259A3C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x20259A52,
+    //2: 01 00 54 00 04 00,
+    0x20259AD2
+};
+
+int enemy_room_232[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x2044CA84, 0x2044CA88,
+    0x01,
+    //room spawners:,
+    0x2044CAB2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x2044CABC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x2044CAD2,
+    //2: 01 00 54 00 04 00,
+    0x2044CB52
+};
+
+int enemy_room_233[] = {
+    //num enemy types: 3, num enemies 8,
+    //0x205EA404, 0x205EA408,
+    0x03,
+    //room spawners:,
+    0x205EA432,
+    //values: 01 00 0C 00 0F 00  //0x0C - Skeleton,
+    //0x205EA43C, //+0x0A address,
+    //room spawners:,
+    0x205EA446,
+    //values: 01 00 2E 00 02 00  //0x2E - Dullahan,
+    //0x205EA450, //+0x0A address,
+    //room spawners:,
+    0x205EA45A,
+    //values: 01 00 11 00 02 00  //0x11 - Skeleton Swordsman,
+    //0x205EA464, //+0x0A address,
+    //1: 01 00 0C 00 06 00,
+    0x205EA472,
+    //2: 01 00 0C 00 06 00,
+    0x205EA4F2,
+    //3: 01 00 0C 00 06 00,
+    0x205EA572,
+    //4: 01 00 0C 00 06 00,
+    0x205EA5F2,
+    //5: 01 00 11 00 06 00,
+    0x205EA672,
+    //6: 01 00 11 00 06 00,
+    0x205EA6F2,
+    //7: 01 00 11 00 06 00,
+    0x205EA772,
+    //8: 01 00 2E 00 06 00,
+    0x205EA7F2
+};
+
+int enemy_room_234[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x20804504, 0x20804508,
+    0x01,
+    //room spawners:,
+    0x20804532,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x2080453C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x20804552,
+    //2: 01 00 54 00 04 00,
+    0x208045D2
+};
+
+int enemy_room_235[] = {
+    //num enemy types: 3, num enemies 4,
+    //0x209E5684, 0x209E5688,
+    0x03,
+    //room spawners:,
+    0x209E56B2,
+    //values: 01 00 4F 00 0F 00  //0x4F - Golden Knight,
+    //0x209E56BC, //+0x0A address,
+    //room spawners:,
+    0x209E56C6,
+    //values: 01 00 53 00 02 00  //0x53 - Cyclops,
+    //0x209E56D0, //+0x0A address,
+    //room spawners:,
+    0x209E56DA,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x209E56E4, //+0x0A address,
+    //1: 01 00 4F 00 04 00,
+    0x209E56F2,
+    //2: 01 00 53 00 04 00,
+    0x209E5772,
+    //3: 01 00 53 00 04 00,
+    0x209E57F2,
+    //4: 01 00 54 00 04 00,
+    0x209E5872
+};
+
+int enemy_room_236[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x20CAE284, 0x20CAE288,
+    0x01,
+    //room spawners:,
+    0x20CAE2B2,
+    //values: 01 00 68 00 00 00  //0x68 - ???,
+    //0x20CAE2BC, //+0x0A address,
+    //1: 01 00 68 00 05 00,
+    0x20CAE2D2
+};
+
+int enemy_room_237[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x20E95A84, 0x20E95A88,
+    0x01,
+    //room spawners:,
+    0x20E95AB2,
+    //values: 01 00 75 00 00 00  //0x75 - ???,
+    //0x20E95ABC, //+0x0A address,
+    //1: 01 00 75 00 04 00,
+    0x20E95AD2
+};
+
+int enemy_room_238[] = {
+    //num enemy types: 2, num enemies 3,
+    //0x21B43E04, 0x21B43E08,
+    0x02,
+    //room spawners:,
+    0x21B43E32,
+    //values: 01 00 0C 00 0F 00  //0x0C - Skeleton,
+    //0x21B43E3C, //+0x0A address,
+    //room spawners:,
+    0x21B43E46,
+    //values: 01 00 3E 00 0F 00  //0x3E - ???,
+    //0x21B43E50, //+0x0A address,
+    //1: 01 00 0C 00 04 00,
+    0x21B43E62,
+    //2: 01 00 0C 00 04 00,
+    0x21B43EE2,
+    //3: 01 00 3E 00 04 00,
+    0x21B43F62
+};
+
+int enemy_room_239[] = {
+    //num enemy types: 4, num enemies 7,
+    //0x21D03904, 0x21D03908,
+    0x04,
+    //room spawners:,
+    0x21D03932,
+    //values: 01 00 0C 00 0F 00  //0x0C - Skeleton,
+    //0x21D0393C, //+0x0A address,
+    //room spawners:,
+    0x21D03946,
+    //values: 01 00 30 00 0F 00  //0x30 - Skeleton Hunter,
+    //0x21D03950, //+0x0A address,
+    //room spawners:,
+    0x21D0395A,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x21D03964, //+0x0A address,
+    //room spawners:,
+    0x21D0396E,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x21D03978, //+0x0A address,
+    //1: 01 00 0C 00 04 00,
+    0x21D03982,
+    //2: 01 00 0C 00 04 00,
+    0x21D03A02,
+    //3: 01 00 0C 00 04 00,
+    0x21D03A82,
+    //4: 01 00 0C 00 04 00,
+    0x21D03B02,
+    //5: 01 00 30 00 04 00,
+    0x21D03B82,
+    //6: 01 00 4B 00 06 00,
+    0x21D03C02,
+    //7: 01 00 54 00 04 00,
+    0x21D03C82
+};
+
+int enemy_room_240[] = {
+    //num enemy types: 4, num enemies 7,
+    //0x21EE6984, 0x21EE6988,
+    0x04,
+    //room spawners:,
+    0x21EE69B2,
+    //values: 01 00 0C 00 00 00  //0x0C - Skeleton,
+    //0x21EE69BC, //+0x0A address,
+    //room spawners:,
+    0x21EE69C6,
+    //values: 01 00 17 00 00 00  //0x17 - Skeleton Archer,
+    //0x21EE69D0, //+0x0A address,
+    //room spawners:,
+    0x21EE69DA,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x21EE69E4, //+0x0A address,
+    //room spawners:,
+    0x21EE69EE,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x21EE69F8, //+0x0A address,
+    //1: 01 00 0C 00 04 00,
+    0x21EE6A02,
+    //2: 01 00 0C 00 04 00,
+    0x21EE6A82,
+    //3: 01 00 17 00 04 00,
+    0x21EE6B02,
+    //4: 01 00 0C 00 04 00,
+    0x21EE6B82,
+    //5: 01 00 0C 00 04 00,
+    0x21EE6C02,
+    //6: 01 00 4B 00 06 00,
+    0x21EE6C82,
+    //7: 01 00 54 00 04 00,
+    0x21EE6D02
+};
+
+int enemy_room_241[] = {
+    //num enemy types: 2, num enemies 2,
+    //0x2209E704, 0x2209E708,
+    0x02,
+    //room spawners:,
+    0x2209E732,
+    //values: 01 00 62 00 02 00  //0x62 - Flea Man,
+    //0x2209E73C, //+0x0A address,
+    //room spawners:,
+    0x2209E746,
+    //values: 01 00 24 00 02 00  //0x24 - Astral Knight,
+    //0x2209E750, //+0x0A address,
+    //1: 01 00 62 00 14 00,
+    0x2209E762,
+    //2: 01 00 24 00 14 00,
+    0x2209E7E2
+};
+
+int enemy_room_242[] = {
+    //num enemy types: 3, num enemies 5,
+    //0x22269B04, 0x22269B08,
+    0x03,
+    //room spawners:,
+    0x22269B32,
+    //values: 01 00 27 00 02 00  //0x27 - Ghost Soldier,
+    //0x22269B3C, //+0x0A address,
+    //room spawners:,
+    0x22269B46,
+    //values: 01 00 30 00 02 00  //0x30 - Skeleton Hunter,
+    //0x22269B50, //+0x0A address,
+    //room spawners:,
+    0x22269B5A,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x22269B64, //+0x0A address,
+    //1: 01 00 30 00 04 00,
+    0x22269B72,
+    //2: 01 00 30 00 04 00,
+    0x22269BF2,
+    //3: 01 00 30 00 04 00,
+    0x22269C72,
+    //4: 01 00 27 00 14 00,
+    0x22269CF2,
+    //5: 01 00 4B 00 06 00,
+    0x22269D72
+};
+
+int enemy_room_243[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x2245EE84, 0x2245EE88,
+    0x01,
+    //room spawners:,
+    0x2245EEB2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x2245EEBC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x2245EED2
+};
+
+int enemy_room_244[] = {
+    //num enemy types: 4, num enemies 4,
+    //0x22646804, 0x22646808,
+    0x04,
+    //room spawners:,
+    0x22646832,
+    //values: 01 00 27 00 02 00  //0x27 - Ghost Soldier,
+    //0x2264683C, //+0x0A address,
+    //room spawners:,
+    0x22646846,
+    //values: 01 00 1A 00 02 00  //0x1A - Heavy Armor,
+    //0x22646850, //+0x0A address,
+    //room spawners:,
+    0x2264685A,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x22646864, //+0x0A address,
+    //room spawners:,
+    0x2264686E,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x22646878, //+0x0A address,
+    //1: 01 00 27 00 14 00,
+    0x22646882,
+    //2: 01 00 1A 00 04 00,
+    0x22646902,
+    //3: 01 00 4B 00 06 00,
+    0x22646982,
+    //4: 01 00 54 00 04 00,
+    0x22646A02
+};
+
+int enemy_room_245[] = {
+    //num enemy types: 1, num enemies 3,
+    //0x229AD204, 0x229AD208,
+    0x01,
+    //room spawners:,
+    0x229AD232,
+    //values: 01 00 4C 00 00 00  //0x4C - Shadow Wolf,
+    //0x229AD23C, //+0x0A address,
+    //1: 01 00 4C 00 04 00,
+    0x229AD252,
+    //2: 01 00 4C 00 04 00,
+    0x229AD2D2,
+    //3: 01 00 4C 00 04 00,
+    0x229AD352
+};
+
+int enemy_room_246[] = {
+    //num enemy types: 3, num enemies 3,
+    //0x22B66D04, 0x22B66D08,
+    0x03,
+    //room spawners:,
+    0x22B66D32,
+    //values: 01 00 07 00 00 00  //0x07 - Zombie,
+    //0x22B66D3C, //+0x0A address,
+    //room spawners:,
+    0x22B66D46,
+    //values: 01 00 01 00 00 00  //0x01 - Spirit,
+    //0x22B66D50, //+0x0A address,
+    //room spawners:,
+    0x22B66D5A,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x22B66D64, //+0x0A address,
+    //1: 01 00 07 00 14 00,
+    0x22B66D72,
+    //2: 01 00 01 00 14 00,
+    0x22B66DF2,
+    //3: 01 00 54 00 04 00,
+    0x22B66E72
+};
+
+int enemy_room_247[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x22D0CF04, 0x22D0CF08,
+    0x01,
+    //room spawners:,
+    0x22D0CF32,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x22D0CF3C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x22D0CF52,
+    //2: 01 00 54 00 04 00,
+    0x22D0CFD2
+};
+
+int enemy_room_248[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x22EB3184, 0x22EB3188,
+    0x01,
+    //room spawners:,
+    0x22EB31B2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x22EB31BC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x22EB31D2,
+    //2: 01 00 54 00 04 00,
+    0x22EB3252
+};
+
+int enemy_room_249[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x2305A784, 0x2305A788,
+    0x01,
+    //room spawners:,
+    0x2305A7B2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x2305A7BC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x2305A7D2
+};
+
+int enemy_room_250[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x231FF404, 0x231FF408,
+    0x01,
+    //room spawners:,
+    0x231FF432,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x231FF43C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x231FF452,
+    //2: 01 00 54 00 04 00,
+    0x231FF4D2
+};
+
+int enemy_room_251[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x233A5C84, 0x233A5C88,
+    0x01,
+    //room spawners:,
+    0x233A5CB2,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x233A5CBC, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x233A5CD2,
+    //2: 01 00 54 00 04 00,
+    0x233A5D52
+};
+
+int enemy_room_252[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x23539704, 0x23539708,
+    0x01,
+    //room spawners:,
+    0x23539732,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x2353973C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x23539752,
+    //2: 01 00 54 00 04 00,
+    0x235397D2
+};
+
+/*
+int enemy_room_253[] = {
+    //num enemy types: 3, num enemies 8,
+    //0x23761B84, 0x23761B88,
+    0x03,
+    //room spawners:,
+    0x23761BB2,
+    //values: 01 00 53 00 0F 00  //0x53 - Cyclops,
+    //0x23761BBC, //+0x0A address,
+    //room spawners:,
+    0x23761BC6,
+    //values: 01 00 57 00 0F 00  //0x57 - Red Ogre,
+    //0x23761BD0, //+0x0A address,
+    //room spawners:,
+    0x23761BDA,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x23761BE4, //+0x0A address,
+    //1: 01 00 53 00 05 00,
+    0x23761BF2,
+    //2: 01 00 53 00 05 00,
+    0x23761C72,
+    //3: 01 00 53 00 05 00,
+    0x23761CF2,
+    //4: 01 00 57 00 05 00,
+    0x23761D72,
+    //5: 01 00 57 00 05 00,
+    0x23761DF2,
+    //6: 01 00 57 00 05 00,
+    0x23761E72,
+    //7: 01 00 54 00 04 00,
+    0x23761EF2,
+    //8: 01 00 54 00 04 00,
+    0x23761F72
+};
+*/
+
+int enemy_room_254[] = {
+    //num enemy types: 2, num enemies 6,
+    //0x238EC184, 0x238EC188,
+    0x02,
+    //room spawners:,
+    0x238EC1B2,
+    //values: 01 00 58 00 02 00  //0x58 - Executioner,
+    //0x238EC1BC, //+0x0A address,
+    //room spawners:,
+    0x238EC1C6,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x238EC1D0, //+0x0A address,
+    //1: 01 00 58 00 05 00,
+    0x238EC1E2,
+    //2: 01 00 58 00 05 00,
+    0x238EC262,
+    //3: 01 00 58 00 05 00,
+    0x238EC2E2,
+    //4: 01 00 58 00 05 00,
+    0x238EC362,
+    //5: 01 00 58 00 04 00,
+    0x238EC3E2,
+    //6: 01 00 54 00 04 00,
+    0x238EC462
+};
+
+int enemy_room_255[] = {
+    //num enemy types: 6, num enemies 14,
+    //0x23AF5584, 0x23AF5588,
+    0x06,
+    //room spawners:,
+    0x23AF55B2,
+    //values: 01 00 3B 00 0F 00  //0x3B - Succubus,
+    //0x23AF55BC, //+0x0A address,
+    //room spawners:,
+    0x23AF55C6,
+    //values: 01 00 72 00 0F 00  //0x72 - ???,
+    //0x23AF55D0, //+0x0A address,
+    //room spawners:,
+    0x23AF55DA,
+    //values: 01 00 73 00 0F 00  //0x73 - ???,
+    //0x23AF55E4, //+0x0A address,
+    //room spawners:,
+    0x23AF55EE,
+    //values: 01 00 74 00 0F 00  //0x74 - ???,
+    //0x23AF55F8, //+0x0A address,
+    //room spawners:,
+    0x23AF5602,
+    //values: 01 00 68 00 0F 00  //0x68 - ???,
+    //0x23AF560C, //+0x0A address,
+    //room spawners:,
+    0x23AF5616,
+    //values: 01 00 46 00 0F 00  //0x46 - ???,
+    //0x23AF5620, //+0x0A address,
+    //1: 01 00 3B 00 06 00,
+    0x23AF5632,
+    //2: 01 00 46 00 06 00,
+    0x23AF56B2,
+    //3: 01 00 68 00 06 00,
+    0x23AF5732,
+    //4: 01 00 68 00 26 00,
+    0x23AF57B2,
+    //5: 01 00 74 00 06 00,
+    0x23AF5832,
+    //6: 01 00 73 00 06 00,
+    0x23AF58B2,
+    //7: 01 00 72 00 06 00,
+    0x23AF5932,
+    //8: 01 00 73 00 06 00,
+    0x23AF59B2,
+    //9: 01 00 72 00 06 00,
+    0x23AF5A32,
+    //10: 01 00 72 00 06 00,
+    0x23AF5AB2,
+    //11: 01 00 72 00 06 00,
+    0x23AF5B32,
+    //12: 01 00 72 00 06 00,
+    0x23AF5BB2,
+    //13: 01 00 72 00 06 00,
+    0x23AF5C32,
+    //14: 01 00 72 00 06 00,
+    0x23AF5CB2
+};
+
+int enemy_room_256[] = {
+    //num enemy types: 3, num enemies 6,
+    //0x23CE4184, 0x23CE4188,
+    0x03,
+    //room spawners:,
+    0x23CE41B2,
+    //values: 01 00 47 00 0F 00  //0x47 - Ghost,
+    //0x23CE41BC, //+0x0A address,
+    //room spawners:,
+    0x23CE41C6,
+    //values: 01 00 0F 00 0F 00  //0x0F - Skeleton Warrior,
+    //0x23CE41D0, //+0x0A address,
+    //room spawners:,
+    0x23CE41DA,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x23CE41E4, //+0x0A address,
+    //1: 01 00 47 00 04 00,
+    0x23CE41F2,
+    //2: 01 00 47 00 04 00,
+    0x23CE4272,
+    //3: 01 00 0F 00 04 00,
+    0x23CE42F2,
+    //4: 01 00 0F 00 04 00,
+    0x23CE4372,
+    //5: 01 00 0F 00 04 00,
+    0x23CE43F2,
+    //6: 01 00 54 00 04 00,
+    0x23CE4472
+};
+
+int enemy_room_257[] = {
+    //num enemy types: 4, num enemies 8,
+    //0x23ED6884, 0x23ED6888,
+    0x04,
+    //room spawners:,
+    0x23ED68B2,
+    //values: 01 00 62 00 02 00  //0x62 - Flea Man,
+    //0x23ED68BC, //+0x0A address,
+    //room spawners:,
+    0x23ED68C6,
+    //values: 01 00 0F 00 0F 00  //0x0F - Skeleton Warrior,
+    //0x23ED68D0, //+0x0A address,
+    //room spawners:,
+    0x23ED68DA,
+    //values: 01 00 47 00 0F 00  //0x47 - Ghost,
+    //0x23ED68E4, //+0x0A address,
+    //room spawners:,
+    0x23ED68EE,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x23ED68F8, //+0x0A address,
+    //1: 01 00 47 00 06 00,
+    0x23ED6902,
+    //2: 01 00 47 00 06 00,
+    0x23ED6982,
+    //3: 01 00 0F 00 06 00,
+    0x23ED6A02,
+    //4: 01 00 0F 00 06 00,
+    0x23ED6A82,
+    //5: 01 00 0F 00 06 00,
+    0x23ED6B02,
+    //6: 01 00 62 00 16 00,
+    0x23ED6B82,
+    //7: 01 00 54 00 04 00,
+    0x23ED6C02,
+    //8: 01 00 54 00 04 00,
+    0x23ED6C82
+};
+
+int enemy_room_258[] = {
+    //num enemy types: 3, num enemies 7,
+    //0x240C9A04, 0x240C9A08,
+    0x03,
+    //room spawners:,
+    0x240C9A32,
+    //values: 01 00 27 00 00 00  //0x27 - Ghost Soldier,
+    //0x240C9A3C, //+0x0A address,
+    //room spawners:,
+    0x240C9A46,
+    //values: 01 00 0F 00 00 00  //0x0F - Skeleton Warrior,
+    //0x240C9A50, //+0x0A address,
+    //room spawners:,
+    0x240C9A5A,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x240C9A64, //+0x0A address,
+    //1: 01 00 27 00 04 00,
+    0x240C9A72,
+    //2: 01 00 27 00 04 00,
+    0x240C9AF2,
+    //3: 01 00 27 00 04 00,
+    0x240C9B72,
+    //4: 01 00 27 00 04 00,
+    0x240C9BF2,
+    //5: 01 00 0F 00 04 00,
+    0x240C9C72,
+    //6: 01 00 0F 00 04 00,
+    0x240C9CF2,
+    //7: 01 00 54 00 04 00,
+    0x240C9D72
+};
+
+int enemy_room_259[] = {
+    //num enemy types: 3, num enemies 6,
+    //0x242B7584, 0x242B7588,
+    0x03,
+    //room spawners:,
+    0x242B75B2,
+    //values: 01 00 27 00 0F 00  //0x27 - Ghost Soldier,
+    //0x242B75BC, //+0x0A address,
+    //room spawners:,
+    0x242B75C6,
+    //values: 01 00 0F 00 0F 00  //0x0F - Skeleton Warrior,
+    //0x242B75D0, //+0x0A address,
+    //room spawners:,
+    0x242B75DA,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x242B75E4, //+0x0A address,
+    //1: 01 00 27 00 04 00,
+    0x242B75F2,
+    //2: 01 00 27 00 04 00,
+    0x242B7672,
+    //3: 01 00 27 00 04 00,
+    0x242B76F2,
+    //4: 01 00 0F 00 04 00,
+    0x242B7772,
+    //5: 01 00 0F 00 04 00,
+    0x242B77F2,
+    //6: 01 00 54 00 04 00,
+    0x242B7872
+};
+
+int enemy_room_260[] = {
+    //num enemy types: 3, num enemies 7,
+    //0x244ADC84, 0x244ADC88,
+    0x03,
+    //room spawners:,
+    0x244ADCB2,
+    //values: 01 00 47 00 00 00  //0x47 - Ghost,
+    //0x244ADCBC, //+0x0A address,
+    //room spawners:,
+    0x244ADCC6,
+    //values: 01 00 01 00 00 00  //0x01 - Spirit,
+    //0x244ADCD0, //+0x0A address,
+    //room spawners:,
+    0x244ADCDA,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x244ADCE4, //+0x0A address,
+    //1: 01 00 01 00 04 00,
+    0x244ADCF2,
+    //2: 01 00 01 00 04 00,
+    0x244ADD72,
+    //3: 01 00 47 00 04 00,
+    0x244ADDF2,
+    //4: 01 00 47 00 04 00,
+    0x244ADE72,
+    //5: 01 00 01 00 04 00,
+    0x244ADEF2,
+    //6: 01 00 01 00 04 00,
+    0x244ADF72,
+    //7: 01 00 54 00 04 00,
+    0x244ADFF2
+};
+
+int enemy_room_261[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x24673604, 0x24673608,
+    0x02,
+    //room spawners:,
+    0x24673632,
+    //values: 01 00 01 00 00 00  //0x01 - Spirit,
+    //0x2467363C, //+0x0A address,
+    //room spawners:,
+    0x24673646,
+    //values: 01 00 4C 00 00 00  //0x4C - Shadow Wolf,
+    //0x24673650, //+0x0A address,
+    //1: 01 00 01 00 14 00,
+    0x24673662,
+    //2: 01 00 4C 00 04 00,
+    0x246736E2,
+    //3: 01 00 4C 00 04 00,
+    0x24673762,
+    //4: 01 00 4C 00 04 00,
+    0x246737E2,
+    //5: 01 00 4C 00 04 00,
+    0x24673862
+};
+
+int enemy_room_262[] = {
+    //num enemy types: 2, num enemies 2,
+    //0x24837A04, 0x24837A08,
+    0x02,
+    //room spawners:,
+    0x24837A32,
+    //values: 01 00 24 00 00 00  //0x24 - Astral Knight,
+    //0x24837A3C, //+0x0A address,
+    //room spawners:,
+    0x24837A46,
+    //values: 01 00 20 00 00 00  //0x20 - Axe Knight,
+    //0x24837A50, //+0x0A address,
+    //1: 01 00 20 00 04 00,
+    0x24837A62,
+    //2: 01 00 24 00 14 00,
+    0x24837AE2
+};
+
+int enemy_room_263[] = {
+    //num enemy types: 3, num enemies 7,
+    //0x24A24B04, 0x24A24B08,
+    0x03,
+    //room spawners:,
+    0x24A24B32,
+    //values: 01 00 0F 00 0F 00  //0x0F - Skeleton Warrior,
+    //0x24A24B3C, //+0x0A address,
+    //room spawners:,
+    0x24A24B46,
+    //values: 01 00 01 00 0F 00  //0x01 - Spirit,
+    //0x24A24B50, //+0x0A address,
+    //room spawners:,
+    0x24A24B5A,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x24A24B64, //+0x0A address,
+    //1: 01 00 01 00 04 00,
+    0x24A24B72,
+    //2: 01 00 01 00 04 00,
+    0x24A24BF2,
+    //3: 01 00 01 00 04 00,
+    0x24A24C72,
+    //4: 01 00 01 00 04 00,
+    0x24A24CF2,
+    //5: 01 00 0F 00 04 00,
+    0x24A24D72,
+    //6: 01 00 0F 00 04 00,
+    0x24A24DF2,
+    //7: 01 00 54 00 04 00,
+    0x24A24E72
+};
+
+int enemy_room_264[] = {
+    //num enemy types: 3, num enemies 5,
+    //0x24BDE884, 0x24BDE888,
+    0x03,
+    //room spawners:,
+    0x24BDE8B2,
+    //values: 01 00 07 00 0F 00  //0x07 - Zombie,
+    //0x24BDE8BC, //+0x0A address,
+    //room spawners:,
+    0x24BDE8C6,
+    //values: 01 00 65 00 02 00  //0x65 - Hanged Man,
+    //0x24BDE8D0, //+0x0A address,
+    //room spawners:,
+    0x24BDE8DA,
+    //values: 01 00 4C 00 0F 00  //0x4C - Shadow Wolf,
+    //0x24BDE8E4, //+0x0A address,
+    //1: 01 00 07 00 16 00,
+    0x24BDE8F2,
+    //2: 01 00 4C 00 14 00,
+    0x24BDE972,
+    //3: 01 00 65 00 06 00,
+    0x24BDE9F2,
+    //4: 01 00 65 00 06 00,
+    0x24BDEA72,
+    //5: 01 00 65 00 06 00,
+    0x24BDEAF2
+};
+
+int enemy_room_265[] = {
+    //num enemy types: 3, num enemies 3,
+    //0x24DA2884, 0x24DA2888,
+    0x03,
+    //room spawners:,
+    0x24DA28B2,
+    //values: 01 00 15 00 0F 00  //0x15 - Armor Knight,
+    //0x24DA28BC, //+0x0A address,
+    //room spawners:,
+    0x24DA28C6,
+    //values: 01 00 24 00 0D 00  //0x24 - Astral Knight,
+    //0x24DA28D0, //+0x0A address,
+    //room spawners:,
+    0x24DA28DA,
+    //values: 01 00 67 00 02 00  //0x67 - Spartacus,
+    //0x24DA28E4, //+0x0A address,
+    //1: 01 00 15 00 04 00,
+    0x24DA28F2,
+    //2: 01 00 24 00 14 00,
+    0x24DA2972,
+    //3: 01 00 67 00 14 00,
+    0x24DA29F2
+};
+
+int enemy_room_266[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x24F26C04, 0x24F26C08,
+    0x01,
+    //room spawners:,
+    0x24F26C32,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x24F26C3C, //+0x0A address,
+    //1: 01 00 54 00 04 00,
+    0x24F26C52,
+    //2: 01 00 54 00 04 00,
+    0x24F26CD2
+};
+
+int enemy_room_267[] = {
+    //num enemy types: 2, num enemies 7,
+    //0x250F8204, 0x250F8208,
+    0x02,
+    //room spawners:,
+    0x250F8232,
+    //values: 01 00 65 00 0F 00  //0x65 - Hanged Man,
+    //0x250F823C, //+0x0A address,
+    //room spawners:,
+    0x250F8246,
+    //values: 01 00 54 00 00 00  //0x54 - ???,
+    //0x250F8250, //+0x0A address,
+    //1: 01 00 65 00 04 00,
+    0x250F8262,
+    //2: 01 00 65 00 04 00,
+    0x250F82E2,
+    //3: 01 00 65 00 04 00,
+    0x250F8362,
+    //4: 01 00 65 00 04 00,
+    0x250F83E2,
+    //5: 01 00 65 00 14 00,
+    0x250F8462,
+    //6: 01 00 65 00 14 00,
+    0x250F84E2,
+    //7: 01 00 54 00 04 00,
+    0x250F8562
+};
+
+int enemy_room_268[] = {
+    //num enemy types: 3, num enemies 7,
+    //0x252B3B04, 0x252B3B08,
+    0x03,
+    //room spawners:,
+    0x252B3B32,
+    //values: 01 00 20 00 0F 00  //0x20 - Axe Knight,
+    //0x252B3B3C, //+0x0A address,
+    //room spawners:,
+    0x252B3B46,
+    //values: 01 00 3A 00 0F 00  //0x3A - Buckbaird,
+    //0x252B3B50, //+0x0A address,
+    //room spawners:,
+    0x252B3B5A,
+    //values: 01 00 4B 00 00 00  //0x4B - ???,
+    //0x252B3B64, //+0x0A address,
+    //1: 01 00 20 00 04 00,
+    0x252B3B72,
+    //2: 01 00 3A 00 04 00,
+    0x252B3BF2,
+    //3: 01 00 3A 00 04 00,
+    0x252B3C72,
+    //4: 01 00 3A 00 04 00,
+    0x252B3CF2,
+    //5: 01 00 3A 00 04 00,
+    0x252B3D72,
+    //6: 01 00 3A 00 04 00,
+    0x252B3DF2,
+    //7: 01 00 4B 00 06 00,
+    0x252B3E72
+};
+
+int enemy_room_269[] = {
+    //num enemy types: 3, num enemies 3,
+    //0x25473184, 0x25473188,
+    0x03,
+    //room spawners:,
+    0x254731B2,
+    //values: 01 00 0A 00 0F 00  //0x0A - Axe Armor,
+    //0x254731BC, //+0x0A address,
+    //room spawners:,
+    0x254731C6,
+    //values: 01 00 6C 00 02 00  //0x6C - Lesser Demon,
+    //0x254731D0, //+0x0A address,
+    //room spawners:,
+    0x254731DA,
+    //values: 01 00 01 00 0D 00  //0x01 - Spirit,
+    //0x254731E4, //+0x0A address,
+    //1: 01 00 0A 00 04 00,
+    0x254731F2,
+    //2: 01 00 01 00 14 00,
+    0x25473272,
+    //3: 01 00 6C 00 14 00,
+    0x254732F2
+};
+
+int enemy_room_270[] = {
+    //num enemy types: 1, num enemies 6,
+    //0x25637384, 0x25637388,
+    0x01,
+    //room spawners:,
+    0x256373B2,
+    //values: 01 00 47 00 02 00  //0x47 - Ghost,
+    //0x256373BC, //+0x0A address,
+    //1: 01 00 47 00 04 00,
+    0x256373D2,
+    //2: 01 00 47 00 04 00,
+    0x25637452,
+    //3: 01 00 47 00 04 00,
+    0x256374D2,
+    //4: 01 00 47 00 04 00,
+    0x25637552,
+    //5: 01 00 47 00 04 00,
+    0x256375D2,
+    //6: 01 00 47 00 04 00,
+    0x25637652
+};
+
+int enemy_room_271[] = {
+    //num enemy types: 1, num enemies 4,
+    //0x25AD2D04, 0x25AD2D08,
+    0x01,
+    //room spawners:,
+    0x25AD2D32,
+    //values: 01 00 62 00 02 00  //0x62 - Flea Man,
+    //0x25AD2D3C, //+0x0A address,
+    //1: 01 00 62 00 04 00,
+    0x25AD2D52,
+    //2: 01 00 62 00 04 00,
+    0x25AD2DD2,
+    //3: 01 00 62 00 04 00,
+    0x25AD2E52,
+    //4: 01 00 62 00 04 00,
+    0x25AD2ED2
+};
+
+int enemy_room_272[] = {
+    //num enemy types: 1, num enemies 4,
+    //0x25EDA184, 0x25EDA188,
+    0x01,
+    //room spawners:,
+    0x25EDA1B2,
+    //values: 01 00 4C 00 0F 00  //0x4C - Shadow Wolf,
+    //0x25EDA1BC, //+0x0A address,
+    //1: 01 00 4C 00 04 00,
+    0x25EDA1D2,
+    //2: 01 00 4C 00 04 00,
+    0x25EDA252,
+    //3: 01 00 4C 00 04 00,
+    0x25EDA2D2,
+    //4: 01 00 4C 00 04 00,
+    0x25EDA352
+};
+
+int enemy_room_273[] = {
+    //num enemy types: 2, num enemies 2,
+    //0x26035A84, 0x26035A88,
+    0x02,
+    //room spawners:,
+    0x26035AB2,
+    //values: 01 00 4F 00 02 00  //0x4F - Golden Knight,
+    //0x26035ABC, //+0x0A address,
+    //room spawners:,
+    0x26035AC6,
+    //values: 01 00 62 00 02 00  //0x62 - Flea Man,
+    //0x26035AD0, //+0x0A address,
+    //1: 01 00 4F 00 14 00,
+    0x26035AE2,
+    //2: 01 00 62 00 14 00,
+    0x26035B62
+};
+
+int enemy_room_274[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x26238604, 0x26238608,
+    0x01,
+    //room spawners:,
+    0x26238632,
+    //values: 01 00 62 00 02 00  //0x62 - Flea Man,
+    //0x2623863C, //+0x0A address,
+    //1: 01 00 62 00 14 00,
+    0x26238652
+};
+
+int enemy_room_275[] = {
+    //num enemy types: 2, num enemies 4,
+    //0x263D9904, 0x263D9908,
+    0x02,
+    //room spawners:,
+    0x263D9932,
+    //values: 01 00 47 00 02 00  //0x47 - Ghost,
+    //0x263D993C, //+0x0A address,
+    //room spawners:,
+    0x263D9946,
+    //values: 01 00 0C 00 0D 00  //0x0C - Skeleton,
+    //0x263D9950, //+0x0A address,
+    //1: 01 00 0C 00 04 00,
+    0x263D9962,
+    //2: 01 00 0C 00 04 00,
+    0x263D99E2,
+    //3: 01 00 47 00 14 00,
+    0x263D9A62,
+    //4: 01 00 47 00 14 00,
+    0x263D9AE2
+};
+
+int enemy_room_276[] = {
+    //num enemy types: 1, num enemies 3,
+    //0x265E8F04, 0x265E8F08,
+    0x01,
+    //room spawners:,
+    0x265E8F32,
+    //values: 01 00 3A 00 0F 00  //0x3A - Buckbaird,
+    //0x265E8F3C, //+0x0A address,
+    //1: 01 00 3A 00 04 00,
+    0x265E8F52,
+    //2: 01 00 3A 00 05 00,
+    0x265E8FD2,
+    //3: 01 00 3A 00 05 00,
+    0x265E9052
+};
+
+int enemy_room_277[] = {
+    //num enemy types: 2, num enemies 5,
+    //0x26CD8484, 0x26CD8488,
+    0x02,
+    //room spawners:,
+    0x26CD84B2,
+    //values: 01 00 4C 00 02 00  //0x4C - Shadow Wolf,
+    //0x26CD84BC, //+0x0A address,
+    //room spawners:,
+    0x26CD84C6,
+    //values: 01 00 30 00 02 00  //0x30 - Skeleton Hunter,
+    //0x26CD84D0, //+0x0A address,
+    //1: 01 00 4C 00 04 00,
+    0x26CD84E2,
+    //2: 01 00 4C 00 04 00,
+    0x26CD8562,
+    //3: 01 00 4C 00 04 00,
+    0x26CD85E2,
+    //4: 01 00 4C 00 04 00,
+    0x26CD8662,
+    //5: 01 00 30 00 04 00,
+    0x26CD86E2
+};
+
+int enemy_room_278[] = {
+    //num enemy types: 1, num enemies 1,
+    //0x26E78784, 0x26E78788,
+    0x01,
+    //room spawners:,
+    0x26E787B2,
+    //values: 01 00 08 00 02 00  //0x08 - Bat,
+    //0x26E787BC, //+0x0A address,
+    //1: 01 00 08 00 14 00,
+    0x26E787D2
+};
+
+int enemy_room_279[] = {
+    //num enemy types: 1, num enemies 3,
+    //0x270F7484, 0x270F7488,
+    0x01,
+    //room spawners:,
+    0x270F74B2,
+    //values: 01 00 62 00 02 00  //0x62 - Flea Man,
+    //0x270F74BC, //+0x0A address,
+    //1: 01 00 62 00 04 00,
+    0x270F74D2,
+    //2: 01 00 62 00 04 00,
+    0x270F7552,
+    //3: 01 00 62 00 04 00,
+    0x270F75D2
+};
+
+int enemy_room_280[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x272D6784, 0x272D6788,
+    0x01,
+    //room spawners:,
+    0x272D67B2,
+    //values: 01 00 47 00 00 00  //0x47 - Ghost,
+    //0x272D67BC, //+0x0A address,
+    //1: 01 00 47 00 04 00,
+    0x272D67D2,
+    //2: 01 00 47 00 04 00,
+    0x272D6852
+};
+
+int enemy_room_281[] = {
+    //num enemy types: 1, num enemies 3,
+    //0x274B4C04, 0x274B4C08,
+    0x01,
+    //room spawners:,
+    0x274B4C32,
+    //values: 01 00 47 00 0F 00  //0x47 - Ghost,
+    //0x274B4C3C, //+0x0A address,
+    //1: 01 00 47 00 04 00,
+    0x274B4C52,
+    //2: 01 00 47 00 04 00,
+    0x274B4CD2,
+    //3: 01 00 47 00 14 00,
+    0x274B4D52
+};
+
+int enemy_room_282[] = {
+    //num enemy types: 1, num enemies 2,
+    //0x276AC304, 0x276AC308,
+    0x01,
+    //room spawners:,
+    0x276AC332,
+    //values: 01 00 47 00 00 00  //0x47 - Ghost,
+    //0x276AC33C, //+0x0A address,
+    //1: 01 00 47 00 04 00,
+    0x276AC352,
+    //2: 01 00 47 00 04 00,
+    0x276AC3D2
+};
+
+int enemy_room_283[] = {
+    //num enemy types: 1, num enemies 3,
+    //0x278A1884, 0x278A1888,
+    0x01,
+    //room spawners:,
+    0x278A18B2,
+    //values: 01 00 47 00 0F 00  //0x47 - Ghost,
+    //0x278A18BC, //+0x0A address,
+    //1: 01 00 47 00 04 00,
+    0x278A18D2,
+    //2: 01 00 47 00 04 00,
+    0x278A1952,
+    //3: 01 00 47 00 14 00,
+    0x278A19D2
+};
+
+
+
+
+
+int* enemy_rooms[] = {
+		enemy_room_1,
+enemy_room_2,
+enemy_room_3,
+enemy_room_4,
+enemy_room_5,
+enemy_room_6,
+enemy_room_7,
+enemy_room_8,
+enemy_room_9,
+enemy_room_10,
+enemy_room_11,
+enemy_room_12,
+enemy_room_13,
+enemy_room_14,
+enemy_room_15,
+enemy_room_16,
+enemy_room_17,
+enemy_room_18,
+enemy_room_19,
+enemy_room_20,
+enemy_room_21,
+enemy_room_22,
+enemy_room_23,
+enemy_room_24,
+enemy_room_25,
+enemy_room_26,
+enemy_room_27,
+enemy_room_28,
+enemy_room_29,
+enemy_room_30,
+enemy_room_31,
+enemy_room_32,
+enemy_room_33,
+enemy_room_34,
+enemy_room_35,
+enemy_room_36,
+enemy_room_37,
+enemy_room_38,
+enemy_room_39,
+enemy_room_40,
+enemy_room_41,
+enemy_room_42,
+enemy_room_43,
+enemy_room_44,
+enemy_room_45,
+//enemy_room_46,
+enemy_room_47,
+enemy_room_48,
+enemy_room_49,
+enemy_room_50,
+enemy_room_51,
+enemy_room_52,
+enemy_room_53,
+enemy_room_54,
+enemy_room_55,
+enemy_room_56,
+enemy_room_57,
+enemy_room_58,
+enemy_room_59,
+enemy_room_60,
+enemy_room_61,
+enemy_room_62,
+enemy_room_63,
+enemy_room_64,
+enemy_room_65,
+enemy_room_66,
+enemy_room_67,
+enemy_room_68,
+enemy_room_69,
+enemy_room_70,
+enemy_room_71,
+enemy_room_72,
+enemy_room_73,
+enemy_room_74,
+enemy_room_75,
+enemy_room_76,
+enemy_room_77,
+enemy_room_78,
+enemy_room_79,
+enemy_room_80,
+enemy_room_81,
+enemy_room_82,
+enemy_room_83,
+enemy_room_84,
+enemy_room_85,
+enemy_room_86,
+enemy_room_87,
+enemy_room_88,
+enemy_room_89,
+enemy_room_90,
+enemy_room_91,
+enemy_room_92,
+enemy_room_93,
+enemy_room_94,
+enemy_room_95,
+enemy_room_96,
+enemy_room_97,
+enemy_room_98,
+enemy_room_99,
+enemy_room_100,
+enemy_room_101,
+enemy_room_102,
+enemy_room_103,
+enemy_room_104,
+enemy_room_105,
+enemy_room_106,
+enemy_room_107,
+enemy_room_108,
+enemy_room_109,
+enemy_room_110,
+enemy_room_111,
+enemy_room_112,
+enemy_room_113,
+enemy_room_114,
+enemy_room_115,
+enemy_room_116,
+enemy_room_117,
+enemy_room_118,
+enemy_room_119,
+enemy_room_120,
+enemy_room_121,
+enemy_room_122,
+enemy_room_123,
+enemy_room_124,
+enemy_room_125,
+enemy_room_126,
+enemy_room_127,
+enemy_room_128,
+enemy_room_129,
+enemy_room_130,
+enemy_room_131,
+enemy_room_132,
+enemy_room_133,
+enemy_room_134,
+enemy_room_135,
+enemy_room_136,
+enemy_room_137,
+enemy_room_138,
+enemy_room_139,
+enemy_room_140,
+enemy_room_141,
+enemy_room_142,
+enemy_room_143,
+enemy_room_144,
+enemy_room_145,
+enemy_room_146,
+enemy_room_147,
+enemy_room_148,
+enemy_room_149,
+enemy_room_150,
+enemy_room_151,
+enemy_room_152,
+enemy_room_153,
+enemy_room_154,
+enemy_room_155,
+enemy_room_156,
+enemy_room_157,
+enemy_room_158,
+enemy_room_159,
+enemy_room_160,
+enemy_room_161,
+enemy_room_162,
+enemy_room_163,
+enemy_room_164,
+enemy_room_165,
+enemy_room_166,
+enemy_room_167,
+enemy_room_168,
+enemy_room_169,
+enemy_room_170,
+enemy_room_171,
+enemy_room_172,
+enemy_room_173,
+enemy_room_174,
+enemy_room_175,
+enemy_room_176,
+enemy_room_177,
+enemy_room_178,
+enemy_room_179,
+enemy_room_180,
+enemy_room_181,
+enemy_room_182,
+enemy_room_183,
+enemy_room_184,
+enemy_room_185,
+enemy_room_186,
+enemy_room_187,
+enemy_room_188,
+enemy_room_189,
+enemy_room_190,
+enemy_room_191,
+enemy_room_192,
+enemy_room_193,
+enemy_room_194,
+enemy_room_195,
+enemy_room_196,
+enemy_room_197,
+enemy_room_198,
+enemy_room_199,
+enemy_room_200,
+enemy_room_201,
+enemy_room_202,
+enemy_room_203,
+enemy_room_204,
+enemy_room_205,
+enemy_room_206,
+enemy_room_207,
+enemy_room_208,
+enemy_room_209,
+enemy_room_210,
+enemy_room_211,
+enemy_room_212,
+enemy_room_213,
+enemy_room_214,
+enemy_room_215,
+enemy_room_216,
+enemy_room_217,
+enemy_room_218,
+enemy_room_219,
+enemy_room_220,
+enemy_room_221,
+enemy_room_222,
+enemy_room_223,
+enemy_room_224,
+enemy_room_225,
+enemy_room_226,
+enemy_room_227,
+enemy_room_228,
+enemy_room_229,
+enemy_room_230,
+enemy_room_231,
+enemy_room_232,
+enemy_room_233,
+enemy_room_234,
+enemy_room_235,
+enemy_room_236,
+enemy_room_237,
+enemy_room_238,
+enemy_room_239,
+enemy_room_240,
+enemy_room_241,
+enemy_room_242,
+enemy_room_243,
+enemy_room_244,
+enemy_room_245,
+enemy_room_246,
+enemy_room_247,
+enemy_room_248,
+enemy_room_249,
+enemy_room_250,
+enemy_room_251,
+enemy_room_252,
+//enemy_room_253,
+enemy_room_254,
+enemy_room_255,
+enemy_room_256,
+enemy_room_257,
+enemy_room_258,
+enemy_room_259,
+enemy_room_260,
+enemy_room_261,
+enemy_room_262,
+enemy_room_263,
+enemy_room_264,
+enemy_room_265,
+enemy_room_266,
+enemy_room_267,
+enemy_room_268,
+enemy_room_269,
+enemy_room_270,
+enemy_room_271,
+enemy_room_272,
+enemy_room_273,
+enemy_room_274,
+enemy_room_275,
+enemy_room_276,
+enemy_room_277,
+enemy_room_278,
+enemy_room_279,
+enemy_room_280,
+enemy_room_281,
+enemy_room_282,
+enemy_room_283,
+		
+	};
+int enemy_rooms_lengths[] = {
+sizeof(enemy_room_1)/sizeof(enemy_room_1[0]),
+sizeof(enemy_room_2)/sizeof(enemy_room_2[0]),
+sizeof(enemy_room_3)/sizeof(enemy_room_3[0]),
+sizeof(enemy_room_4)/sizeof(enemy_room_4[0]),
+sizeof(enemy_room_5)/sizeof(enemy_room_5[0]),
+sizeof(enemy_room_6)/sizeof(enemy_room_6[0]),
+sizeof(enemy_room_7)/sizeof(enemy_room_7[0]),
+sizeof(enemy_room_8)/sizeof(enemy_room_8[0]),
+sizeof(enemy_room_9)/sizeof(enemy_room_9[0]),
+sizeof(enemy_room_10)/sizeof(enemy_room_10[0]),
+sizeof(enemy_room_11)/sizeof(enemy_room_11[0]),
+sizeof(enemy_room_12)/sizeof(enemy_room_12[0]),
+sizeof(enemy_room_13)/sizeof(enemy_room_13[0]),
+sizeof(enemy_room_14)/sizeof(enemy_room_14[0]),
+sizeof(enemy_room_15)/sizeof(enemy_room_15[0]),
+sizeof(enemy_room_16)/sizeof(enemy_room_16[0]),
+sizeof(enemy_room_17)/sizeof(enemy_room_17[0]),
+sizeof(enemy_room_18)/sizeof(enemy_room_18[0]),
+sizeof(enemy_room_19)/sizeof(enemy_room_19[0]),
+sizeof(enemy_room_20)/sizeof(enemy_room_20[0]),
+sizeof(enemy_room_21)/sizeof(enemy_room_21[0]),
+sizeof(enemy_room_22)/sizeof(enemy_room_22[0]),
+sizeof(enemy_room_23)/sizeof(enemy_room_23[0]),
+sizeof(enemy_room_24)/sizeof(enemy_room_24[0]),
+sizeof(enemy_room_25)/sizeof(enemy_room_25[0]),
+sizeof(enemy_room_26)/sizeof(enemy_room_26[0]),
+sizeof(enemy_room_27)/sizeof(enemy_room_27[0]),
+sizeof(enemy_room_28)/sizeof(enemy_room_28[0]),
+sizeof(enemy_room_29)/sizeof(enemy_room_29[0]),
+sizeof(enemy_room_30)/sizeof(enemy_room_30[0]),
+sizeof(enemy_room_31)/sizeof(enemy_room_31[0]),
+sizeof(enemy_room_32)/sizeof(enemy_room_32[0]),
+sizeof(enemy_room_33)/sizeof(enemy_room_33[0]),
+sizeof(enemy_room_34)/sizeof(enemy_room_34[0]),
+sizeof(enemy_room_35)/sizeof(enemy_room_35[0]),
+sizeof(enemy_room_36)/sizeof(enemy_room_36[0]),
+sizeof(enemy_room_37)/sizeof(enemy_room_37[0]),
+sizeof(enemy_room_38)/sizeof(enemy_room_38[0]),
+sizeof(enemy_room_39)/sizeof(enemy_room_39[0]),
+sizeof(enemy_room_40)/sizeof(enemy_room_40[0]),
+sizeof(enemy_room_41)/sizeof(enemy_room_41[0]),
+sizeof(enemy_room_42)/sizeof(enemy_room_42[0]),
+sizeof(enemy_room_43)/sizeof(enemy_room_43[0]),
+sizeof(enemy_room_44)/sizeof(enemy_room_44[0]),
+sizeof(enemy_room_45)/sizeof(enemy_room_45[0]),
+//sizeof(enemy_room_46)/sizeof(enemy_room_46[0]),
+sizeof(enemy_room_47)/sizeof(enemy_room_47[0]),
+sizeof(enemy_room_48)/sizeof(enemy_room_48[0]),
+sizeof(enemy_room_49)/sizeof(enemy_room_49[0]),
+sizeof(enemy_room_50)/sizeof(enemy_room_50[0]),
+sizeof(enemy_room_51)/sizeof(enemy_room_51[0]),
+sizeof(enemy_room_52)/sizeof(enemy_room_52[0]),
+sizeof(enemy_room_53)/sizeof(enemy_room_53[0]),
+sizeof(enemy_room_54)/sizeof(enemy_room_54[0]),
+sizeof(enemy_room_55)/sizeof(enemy_room_55[0]),
+sizeof(enemy_room_56)/sizeof(enemy_room_56[0]),
+sizeof(enemy_room_57)/sizeof(enemy_room_57[0]),
+sizeof(enemy_room_58)/sizeof(enemy_room_58[0]),
+sizeof(enemy_room_59)/sizeof(enemy_room_59[0]),
+sizeof(enemy_room_60)/sizeof(enemy_room_60[0]),
+sizeof(enemy_room_61)/sizeof(enemy_room_61[0]),
+sizeof(enemy_room_62)/sizeof(enemy_room_62[0]),
+sizeof(enemy_room_63)/sizeof(enemy_room_63[0]),
+sizeof(enemy_room_64)/sizeof(enemy_room_64[0]),
+sizeof(enemy_room_65)/sizeof(enemy_room_65[0]),
+sizeof(enemy_room_66)/sizeof(enemy_room_66[0]),
+sizeof(enemy_room_67)/sizeof(enemy_room_67[0]),
+sizeof(enemy_room_68)/sizeof(enemy_room_68[0]),
+sizeof(enemy_room_69)/sizeof(enemy_room_69[0]),
+sizeof(enemy_room_70)/sizeof(enemy_room_70[0]),
+sizeof(enemy_room_71)/sizeof(enemy_room_71[0]),
+sizeof(enemy_room_72)/sizeof(enemy_room_72[0]),
+sizeof(enemy_room_73)/sizeof(enemy_room_73[0]),
+sizeof(enemy_room_74)/sizeof(enemy_room_74[0]),
+sizeof(enemy_room_75)/sizeof(enemy_room_75[0]),
+sizeof(enemy_room_76)/sizeof(enemy_room_76[0]),
+sizeof(enemy_room_77)/sizeof(enemy_room_77[0]),
+sizeof(enemy_room_78)/sizeof(enemy_room_78[0]),
+sizeof(enemy_room_79)/sizeof(enemy_room_79[0]),
+sizeof(enemy_room_80)/sizeof(enemy_room_80[0]),
+sizeof(enemy_room_81)/sizeof(enemy_room_81[0]),
+sizeof(enemy_room_82)/sizeof(enemy_room_82[0]),
+sizeof(enemy_room_83)/sizeof(enemy_room_83[0]),
+sizeof(enemy_room_84)/sizeof(enemy_room_84[0]),
+sizeof(enemy_room_85)/sizeof(enemy_room_85[0]),
+sizeof(enemy_room_86)/sizeof(enemy_room_86[0]),
+sizeof(enemy_room_87)/sizeof(enemy_room_87[0]),
+sizeof(enemy_room_88)/sizeof(enemy_room_88[0]),
+sizeof(enemy_room_89)/sizeof(enemy_room_89[0]),
+sizeof(enemy_room_90)/sizeof(enemy_room_90[0]),
+sizeof(enemy_room_91)/sizeof(enemy_room_91[0]),
+sizeof(enemy_room_92)/sizeof(enemy_room_92[0]),
+sizeof(enemy_room_93)/sizeof(enemy_room_93[0]),
+sizeof(enemy_room_94)/sizeof(enemy_room_94[0]),
+sizeof(enemy_room_95)/sizeof(enemy_room_95[0]),
+sizeof(enemy_room_96)/sizeof(enemy_room_96[0]),
+sizeof(enemy_room_97)/sizeof(enemy_room_97[0]),
+sizeof(enemy_room_98)/sizeof(enemy_room_98[0]),
+sizeof(enemy_room_99)/sizeof(enemy_room_99[0]),
+sizeof(enemy_room_100)/sizeof(enemy_room_100[0]),
+sizeof(enemy_room_101)/sizeof(enemy_room_101[0]),
+sizeof(enemy_room_102)/sizeof(enemy_room_102[0]),
+sizeof(enemy_room_103)/sizeof(enemy_room_103[0]),
+sizeof(enemy_room_104)/sizeof(enemy_room_104[0]),
+sizeof(enemy_room_105)/sizeof(enemy_room_105[0]),
+sizeof(enemy_room_106)/sizeof(enemy_room_106[0]),
+sizeof(enemy_room_107)/sizeof(enemy_room_107[0]),
+sizeof(enemy_room_108)/sizeof(enemy_room_108[0]),
+sizeof(enemy_room_109)/sizeof(enemy_room_109[0]),
+sizeof(enemy_room_110)/sizeof(enemy_room_110[0]),
+sizeof(enemy_room_111)/sizeof(enemy_room_111[0]),
+sizeof(enemy_room_112)/sizeof(enemy_room_112[0]),
+sizeof(enemy_room_113)/sizeof(enemy_room_113[0]),
+sizeof(enemy_room_114)/sizeof(enemy_room_114[0]),
+sizeof(enemy_room_115)/sizeof(enemy_room_115[0]),
+sizeof(enemy_room_116)/sizeof(enemy_room_116[0]),
+sizeof(enemy_room_117)/sizeof(enemy_room_117[0]),
+sizeof(enemy_room_118)/sizeof(enemy_room_118[0]),
+sizeof(enemy_room_119)/sizeof(enemy_room_119[0]),
+sizeof(enemy_room_120)/sizeof(enemy_room_120[0]),
+sizeof(enemy_room_121)/sizeof(enemy_room_121[0]),
+sizeof(enemy_room_122)/sizeof(enemy_room_122[0]),
+sizeof(enemy_room_123)/sizeof(enemy_room_123[0]),
+sizeof(enemy_room_124)/sizeof(enemy_room_124[0]),
+sizeof(enemy_room_125)/sizeof(enemy_room_125[0]),
+sizeof(enemy_room_126)/sizeof(enemy_room_126[0]),
+sizeof(enemy_room_127)/sizeof(enemy_room_127[0]),
+sizeof(enemy_room_128)/sizeof(enemy_room_128[0]),
+sizeof(enemy_room_129)/sizeof(enemy_room_129[0]),
+sizeof(enemy_room_130)/sizeof(enemy_room_130[0]),
+sizeof(enemy_room_131)/sizeof(enemy_room_131[0]),
+sizeof(enemy_room_132)/sizeof(enemy_room_132[0]),
+sizeof(enemy_room_133)/sizeof(enemy_room_133[0]),
+sizeof(enemy_room_134)/sizeof(enemy_room_134[0]),
+sizeof(enemy_room_135)/sizeof(enemy_room_135[0]),
+sizeof(enemy_room_136)/sizeof(enemy_room_136[0]),
+sizeof(enemy_room_137)/sizeof(enemy_room_137[0]),
+sizeof(enemy_room_138)/sizeof(enemy_room_138[0]),
+sizeof(enemy_room_139)/sizeof(enemy_room_139[0]),
+sizeof(enemy_room_140)/sizeof(enemy_room_140[0]),
+sizeof(enemy_room_141)/sizeof(enemy_room_141[0]),
+sizeof(enemy_room_142)/sizeof(enemy_room_142[0]),
+sizeof(enemy_room_143)/sizeof(enemy_room_143[0]),
+sizeof(enemy_room_144)/sizeof(enemy_room_144[0]),
+sizeof(enemy_room_145)/sizeof(enemy_room_145[0]),
+sizeof(enemy_room_146)/sizeof(enemy_room_146[0]),
+sizeof(enemy_room_147)/sizeof(enemy_room_147[0]),
+sizeof(enemy_room_148)/sizeof(enemy_room_148[0]),
+sizeof(enemy_room_149)/sizeof(enemy_room_149[0]),
+sizeof(enemy_room_150)/sizeof(enemy_room_150[0]),
+sizeof(enemy_room_151)/sizeof(enemy_room_151[0]),
+sizeof(enemy_room_152)/sizeof(enemy_room_152[0]),
+sizeof(enemy_room_153)/sizeof(enemy_room_153[0]),
+sizeof(enemy_room_154)/sizeof(enemy_room_154[0]),
+sizeof(enemy_room_155)/sizeof(enemy_room_155[0]),
+sizeof(enemy_room_156)/sizeof(enemy_room_156[0]),
+sizeof(enemy_room_157)/sizeof(enemy_room_157[0]),
+sizeof(enemy_room_158)/sizeof(enemy_room_158[0]),
+sizeof(enemy_room_159)/sizeof(enemy_room_159[0]),
+sizeof(enemy_room_160)/sizeof(enemy_room_160[0]),
+sizeof(enemy_room_161)/sizeof(enemy_room_161[0]),
+sizeof(enemy_room_162)/sizeof(enemy_room_162[0]),
+sizeof(enemy_room_163)/sizeof(enemy_room_163[0]),
+sizeof(enemy_room_164)/sizeof(enemy_room_164[0]),
+sizeof(enemy_room_165)/sizeof(enemy_room_165[0]),
+sizeof(enemy_room_166)/sizeof(enemy_room_166[0]),
+sizeof(enemy_room_167)/sizeof(enemy_room_167[0]),
+sizeof(enemy_room_168)/sizeof(enemy_room_168[0]),
+sizeof(enemy_room_169)/sizeof(enemy_room_169[0]),
+sizeof(enemy_room_170)/sizeof(enemy_room_170[0]),
+sizeof(enemy_room_171)/sizeof(enemy_room_171[0]),
+sizeof(enemy_room_172)/sizeof(enemy_room_172[0]),
+sizeof(enemy_room_173)/sizeof(enemy_room_173[0]),
+sizeof(enemy_room_174)/sizeof(enemy_room_174[0]),
+sizeof(enemy_room_175)/sizeof(enemy_room_175[0]),
+sizeof(enemy_room_176)/sizeof(enemy_room_176[0]),
+sizeof(enemy_room_177)/sizeof(enemy_room_177[0]),
+sizeof(enemy_room_178)/sizeof(enemy_room_178[0]),
+sizeof(enemy_room_179)/sizeof(enemy_room_179[0]),
+sizeof(enemy_room_180)/sizeof(enemy_room_180[0]),
+sizeof(enemy_room_181)/sizeof(enemy_room_181[0]),
+sizeof(enemy_room_182)/sizeof(enemy_room_182[0]),
+sizeof(enemy_room_183)/sizeof(enemy_room_183[0]),
+sizeof(enemy_room_184)/sizeof(enemy_room_184[0]),
+sizeof(enemy_room_185)/sizeof(enemy_room_185[0]),
+sizeof(enemy_room_186)/sizeof(enemy_room_186[0]),
+sizeof(enemy_room_187)/sizeof(enemy_room_187[0]),
+sizeof(enemy_room_188)/sizeof(enemy_room_188[0]),
+sizeof(enemy_room_189)/sizeof(enemy_room_189[0]),
+sizeof(enemy_room_190)/sizeof(enemy_room_190[0]),
+sizeof(enemy_room_191)/sizeof(enemy_room_191[0]),
+sizeof(enemy_room_192)/sizeof(enemy_room_192[0]),
+sizeof(enemy_room_193)/sizeof(enemy_room_193[0]),
+sizeof(enemy_room_194)/sizeof(enemy_room_194[0]),
+sizeof(enemy_room_195)/sizeof(enemy_room_195[0]),
+sizeof(enemy_room_196)/sizeof(enemy_room_196[0]),
+sizeof(enemy_room_197)/sizeof(enemy_room_197[0]),
+sizeof(enemy_room_198)/sizeof(enemy_room_198[0]),
+sizeof(enemy_room_199)/sizeof(enemy_room_199[0]),
+sizeof(enemy_room_200)/sizeof(enemy_room_200[0]),
+sizeof(enemy_room_201)/sizeof(enemy_room_201[0]),
+sizeof(enemy_room_202)/sizeof(enemy_room_202[0]),
+sizeof(enemy_room_203)/sizeof(enemy_room_203[0]),
+sizeof(enemy_room_204)/sizeof(enemy_room_204[0]),
+sizeof(enemy_room_205)/sizeof(enemy_room_205[0]),
+sizeof(enemy_room_206)/sizeof(enemy_room_206[0]),
+sizeof(enemy_room_207)/sizeof(enemy_room_207[0]),
+sizeof(enemy_room_208)/sizeof(enemy_room_208[0]),
+sizeof(enemy_room_209)/sizeof(enemy_room_209[0]),
+sizeof(enemy_room_210)/sizeof(enemy_room_210[0]),
+sizeof(enemy_room_211)/sizeof(enemy_room_211[0]),
+sizeof(enemy_room_212)/sizeof(enemy_room_212[0]),
+sizeof(enemy_room_213)/sizeof(enemy_room_213[0]),
+sizeof(enemy_room_214)/sizeof(enemy_room_214[0]),
+sizeof(enemy_room_215)/sizeof(enemy_room_215[0]),
+sizeof(enemy_room_216)/sizeof(enemy_room_216[0]),
+sizeof(enemy_room_217)/sizeof(enemy_room_217[0]),
+sizeof(enemy_room_218)/sizeof(enemy_room_218[0]),
+sizeof(enemy_room_219)/sizeof(enemy_room_219[0]),
+sizeof(enemy_room_220)/sizeof(enemy_room_220[0]),
+sizeof(enemy_room_221)/sizeof(enemy_room_221[0]),
+sizeof(enemy_room_222)/sizeof(enemy_room_222[0]),
+sizeof(enemy_room_223)/sizeof(enemy_room_223[0]),
+sizeof(enemy_room_224)/sizeof(enemy_room_224[0]),
+sizeof(enemy_room_225)/sizeof(enemy_room_225[0]),
+sizeof(enemy_room_226)/sizeof(enemy_room_226[0]),
+sizeof(enemy_room_227)/sizeof(enemy_room_227[0]),
+sizeof(enemy_room_228)/sizeof(enemy_room_228[0]),
+sizeof(enemy_room_229)/sizeof(enemy_room_229[0]),
+sizeof(enemy_room_230)/sizeof(enemy_room_230[0]),
+sizeof(enemy_room_231)/sizeof(enemy_room_231[0]),
+sizeof(enemy_room_232)/sizeof(enemy_room_232[0]),
+sizeof(enemy_room_233)/sizeof(enemy_room_233[0]),
+sizeof(enemy_room_234)/sizeof(enemy_room_234[0]),
+sizeof(enemy_room_235)/sizeof(enemy_room_235[0]),
+sizeof(enemy_room_236)/sizeof(enemy_room_236[0]),
+sizeof(enemy_room_237)/sizeof(enemy_room_237[0]),
+sizeof(enemy_room_238)/sizeof(enemy_room_238[0]),
+sizeof(enemy_room_239)/sizeof(enemy_room_239[0]),
+sizeof(enemy_room_240)/sizeof(enemy_room_240[0]),
+sizeof(enemy_room_241)/sizeof(enemy_room_241[0]),
+sizeof(enemy_room_242)/sizeof(enemy_room_242[0]),
+sizeof(enemy_room_243)/sizeof(enemy_room_243[0]),
+sizeof(enemy_room_244)/sizeof(enemy_room_244[0]),
+sizeof(enemy_room_245)/sizeof(enemy_room_245[0]),
+sizeof(enemy_room_246)/sizeof(enemy_room_246[0]),
+sizeof(enemy_room_247)/sizeof(enemy_room_247[0]),
+sizeof(enemy_room_248)/sizeof(enemy_room_248[0]),
+sizeof(enemy_room_249)/sizeof(enemy_room_249[0]),
+sizeof(enemy_room_250)/sizeof(enemy_room_250[0]),
+sizeof(enemy_room_251)/sizeof(enemy_room_251[0]),
+sizeof(enemy_room_252)/sizeof(enemy_room_252[0]),
+//sizeof(enemy_room_253)/sizeof(enemy_room_253[0]),
+sizeof(enemy_room_254)/sizeof(enemy_room_254[0]),
+sizeof(enemy_room_255)/sizeof(enemy_room_255[0]),
+sizeof(enemy_room_256)/sizeof(enemy_room_256[0]),
+sizeof(enemy_room_257)/sizeof(enemy_room_257[0]),
+sizeof(enemy_room_258)/sizeof(enemy_room_258[0]),
+sizeof(enemy_room_259)/sizeof(enemy_room_259[0]),
+sizeof(enemy_room_260)/sizeof(enemy_room_260[0]),
+sizeof(enemy_room_261)/sizeof(enemy_room_261[0]),
+sizeof(enemy_room_262)/sizeof(enemy_room_262[0]),
+sizeof(enemy_room_263)/sizeof(enemy_room_263[0]),
+sizeof(enemy_room_264)/sizeof(enemy_room_264[0]),
+sizeof(enemy_room_265)/sizeof(enemy_room_265[0]),
+sizeof(enemy_room_266)/sizeof(enemy_room_266[0]),
+sizeof(enemy_room_267)/sizeof(enemy_room_267[0]),
+sizeof(enemy_room_268)/sizeof(enemy_room_268[0]),
+sizeof(enemy_room_269)/sizeof(enemy_room_269[0]),
+sizeof(enemy_room_270)/sizeof(enemy_room_270[0]),
+sizeof(enemy_room_271)/sizeof(enemy_room_271[0]),
+sizeof(enemy_room_272)/sizeof(enemy_room_272[0]),
+sizeof(enemy_room_273)/sizeof(enemy_room_273[0]),
+sizeof(enemy_room_274)/sizeof(enemy_room_274[0]),
+sizeof(enemy_room_275)/sizeof(enemy_room_275[0]),
+sizeof(enemy_room_276)/sizeof(enemy_room_276[0]),
+sizeof(enemy_room_277)/sizeof(enemy_room_277[0]),
+sizeof(enemy_room_278)/sizeof(enemy_room_278[0]),
+sizeof(enemy_room_279)/sizeof(enemy_room_279[0]),
+sizeof(enemy_room_280)/sizeof(enemy_room_280[0]),
+sizeof(enemy_room_281)/sizeof(enemy_room_281[0]),
+sizeof(enemy_room_282)/sizeof(enemy_room_282[0]),
+sizeof(enemy_room_283)/sizeof(enemy_room_283[0]),
+};
+	
+	const size_t enemy_rooms_count = sizeof(enemy_rooms) / sizeof(enemy_rooms[0]);
+	
+	int forbidden_overwrites[] = {
+		0x00,0x02,0x06,//0x0C,
+		0x012,0x18,0x1A,0x1B,0x1C,0x1D,
+		0x26,0x2B,0x2C,0x2D,
+		0x31,0x32,0x33,0x37,0x3B,0x3C,0x3D,0x3E,0x3F,//0x38 //was excluded for item reason, but room excluded
+		0x40,0x41,0x42,0x43,0x44,0x45,0x46,0x48,0x49,0x4A,0x4B,0x4D,
+		0x50,0x51,0x52,0x54,0x55,0x56,0x59,0x5A,0x5B,0x5C,0x5E,0x5F,
+		0x60,0x63,0x64,0x68,0x6E,
+		0x72,0x73,0x74,0x75,0x76,0x77,0x78,0x79,0x7A,0x7B,0x7C,0x7D,0x7E,0x7F,
+		0x16,0x05,0x62, //excluded for CS reasons TODO: remove rooms instead of enemies...
+	}; //and anything larger than 0x7F
+
+	int forbidden_writes[] = {
+		0x7F,0x7E,0x7D,0x7C,0x7B,0x7A,0x79,0x78,0x77,0x76,0x75,0x74,0x73,0x72,
+		0x6E,0x68,0x64,0x63,0x60,
+		0x5F,0x5E,0x5D,0x5C,0x5B,0x5A,0x59,0x56,0x55,0x54,0x52,0x51,0x50,
+		0x4F,0x4D,0x4B,0x4A,0x49,0x48,0x46,0x45,0x44,0x43,0x42,0x41,0x40,
+		0x3F,0x3E,0x3D,0x3C,0x3B,0x37,0x33,0x32,0x31,
+		0x2D,0x2C,0x2B,0x26,
+		0x1D,0x1C,0x18,0x12,
+		0x06,0x03,0x02,0x00,
+		//0x4F, 0x5D, 0x03, //potentially unbeatable enemies
+		//0x14, //if it spawns where a flying enemy was that could make it 'impossible' to hit.
+	}; //and anything larger than 0x7F (obviously)
+
+	int SIZE = 1;
+	unsigned char buffer[SIZE];
+	int room_index = 0;	
+	unsigned char newByte;
+	unsigned char overwritten_val;
+	_Bool valid = true;
+	int randVal = 0;
+	int idx = 0; 
+	
+
+	for(int i = 0; i < enemy_rooms_count; i++)
+	{
+		for(int t = 1; t <= enemy_rooms[i][0]; t++) //<= because it is indexed from 1 through enemy_rooms[i][0];
+		{	
+			fseek(fp,enemy_rooms[i][t],SEEK_SET);
+			fread(buffer,sizeof(buffer),1,fp);
+			overwritten_val = buffer[0];
+			do
+			{
+				valid = true;
+				randVal = rand() % 0x72;
+				for(int n = 0; n < (sizeof(forbidden_writes) / sizeof(forbidden_writes[0])); n++)
+				{
+					if(randVal == forbidden_writes[n])
+					{
+						valid = false;
+						break;
+					}
+				}
+				for(int n = 1; n < t; n++) //
+				{
+					fseek(fp,enemy_rooms[i][n],SEEK_SET);
+					fread(buffer,sizeof(buffer),1,fp);
+					if(randVal == buffer[0])
+					{
+						valid = false;
+						break;
+					}
+				}
+			}while(!valid);// || randVal == overwritten_val); //testing purpose: do not choose the default enemy.
+			newByte = (unsigned char)randVal;
+			
+			fseek(fp,enemy_rooms[i][t],SEEK_SET);
+			fread(buffer,sizeof(buffer),1,fp);
+			valid = true;
+			for(int n = 0; n < (sizeof(forbidden_overwrites) / sizeof(forbidden_overwrites[0])); n++)
+			{	
+				if(forbidden_overwrites[n] == buffer[0])
+				{
+					valid = false;
+					break;
+				}
+			}
+			if(valid)
+			{
+				fseek(fp,enemy_rooms[i][t],SEEK_SET);
+				fread(buffer,sizeof(buffer),1,fp);
+				overwritten_val = buffer[0];
+				fseek(fp,enemy_rooms[i][t],SEEK_SET);
+				fwrite(&newByte,sizeof(newByte),1,fp);
+				fseek(fp,enemy_rooms[i][t]+0x0A,SEEK_SET);
+				fwrite(&newByte,sizeof(newByte),1,fp);
+				for(int n = ((enemy_rooms[i][0])+1); n < enemy_rooms_lengths[i]; n++) 
+				{
+					fseek(fp,enemy_rooms[i][n],SEEK_SET);
+					fread(buffer,sizeof(buffer),1,fp);
+					if(buffer[0] == overwritten_val)
+					{
+						fseek(fp,enemy_rooms[i][n],SEEK_SET);
+						fwrite(&newByte,sizeof(newByte),1,fp);
+					}
+				}
+			}
+		}
+	}
+	
+	
+	//int chance = 90; //might change this to user decided...
+	randomize_Golden_Knight_to_Boss(fp,chance);
+}
+
 void randomize_area_locking(FILE* fp)
 {	
 	int BossEntranceAddress[] = {
@@ -4415,24 +12155,130 @@ void randomize_area_locking(FILE* fp)
 	//TESTING:
 	 int DPoW_torches[] =  		
 	 {
-		 0x10171D00, //Black = 0x5C;
+		 //Black = 0x5C;
+		 		0x10171B80,
+		0x10171C00,
+		0x10171C80,
+		0x10171D00,
+		0x10171E00,
+		0x103697F0,
+		0x10369870,
+		0x103698F0,
+		0x10369970,
+		0x103699F0,
+		0x10369A70,
+		0x105803F0,
+		0x10580470,
+		0x105804F0,
+		0x10580570,
+		0x105805F0,
+		0x10580670,
+		0x105806F0,
+		0x10785DF0,
+		0x10785E70,
+		0x10785EF0,
+		0x10785F70,
+		0x10785FF0,
+		0x10786070,
 	 };
 	 int GFbT_torches[] =		
 	 {
-		 0x158279F0, //Blue = 0x5A;
+		//Blue = 0x5A;
+		0x158279F0,
+		0x15827AF0,
+		0x15827B70,
+		0x15827BF0,
+		0x1599C340,
+		0x1599C3C0,
+		0x1599C440,
+		0x1599C4C0,
+		0x1599C540,
+		0x1599C5C0,
+		0x15B0CB10,
+		0x15B0CB90,
+		0x15B0CC10,
+		0x15B0CC90,
+		0x15C7C6F0,
+		0x15C7C770,
+		0x15C7C7F0,
+		0x15C7C870,
+		0x15C7C8F0,
+		0x15C7C970,
+		0x15C7C9F0,
+		0x15C7CA70,
 	 };
 	 int ASML_torches[] =
 	 {
-		 0xD1A2470, //Red = 0x5B;
+		//Red = 0x5B;
+		0x0D1A2470,
+		0x0D1A2570,
+		0x0D1A25F0,
+		0x0D329DF0,
+		0x0D329E70,
+		0x0D329EF0,
+		0x0D329F70,
+		0x0D4CA7F0,
+		0x0D4CA870,
+		0x0D4CA8F0,
+		0x0D4CA970,
+		0x0D629AF0,
+		0x0D629B70,
+		0x0D629BF0,
+		0x0D629C70,
+		0x0D629CF0,
+		0x0D629D70,
+		0x0D781B70,
+		0x0D781BF0,
+		0x0D781C70,
+		0x0D781CF0,
+		0x0D781D70,
+		0x0D781DF0,
+		0x0D8DC3F0,
+		0x0D8DC470,
 	 };
 	 int HoSR_torches[] = 		
 	 {
 		 //0x6703980, //Yellow = 0x5D;
-		 0x2DF7290, 
+		0x02DF7290,
+		0x02DF7390,
+		0x02FC7700,
+		0x02FC7780,
+		0x02FC7800,
+		0x02FC7880,
+		0x02FC7900,
+		0x02FC7980,
+		0x02FC7A00,
 	 };
 	 int Theatre_torches[] =  	
 	 {
-		 0x26237AF0, //White = 0x59;
+		 //White = 0x59;
+		 		0x26237AF0,
+		0x26237BF0,
+		0x26237C70,
+		0x26237CF0,
+		0x26237D70,
+		0x26237DF0,
+		0x263D9760,
+		0x263D97E0,
+		0x265E8070,
+		0x265E80F0,
+		0x265E8170,
+		0x265E81F0,
+		0x265E82F0,
+		0x265E8370,
+		0x267F7D70,
+		0x267F7DF0,
+		0x267F7E70,
+		0x267F7EF0,
+		0x267F7F70,
+		0x267F7FF0,
+		0x267F8070,
+		0x267F80F0,
+		0x26997680,
+		0x26997700,
+		0x26997780,
+		0x26997800,
+		0x26997880,
 	 };	
 	int keys[] = {
 		0x5B,0x5A,0x5D,0x5C,0x59
@@ -5819,7 +13665,7 @@ void randomize_torchsanity(FILE* fp)
 	int SIZE = 1;
 	unsigned char buffer[SIZE];
 	
-		int item_progression[] = {
+	int item_progression[] = {
 		0x7F, 0x80, 0x81, 0x82, 0x83,
 		0x02, 0x03, 0x05,
 		0x42,
@@ -5836,6 +13682,8 @@ void randomize_torchsanity(FILE* fp)
 		0x86, 0x8D,
 		0x59, 0x5A, 0x5B, 0x5C, 0x5D,
 	};
+
+	int attempts = 0;
 
 	int item_progression_LEN = sizeof(item_progression) / sizeof(int);
 	int invalid_LEN = sizeof(invalid_overwrite_items) / sizeof(int);
@@ -5857,6 +13705,7 @@ void randomize_torchsanity(FILE* fp)
 		}
 		if(valid)
 		{
+			fseek(fp, torches[i], SEEK_SET); 
 			newByte = items_no_progression[randVal];
 			fwrite(&newByte,sizeof(newByte),1,fp);
 		}
@@ -5867,10 +13716,7 @@ void randomize_torchsanity(FILE* fp)
 	{
 		if ((rand() % 100) < 33)
 		{
-			int randVal;
-			unsigned char buffer[1];
-			int attempts = 0;
-			_Bool valid;
+			valid = true;;
 
 			do
 			{
@@ -5897,7 +13743,7 @@ void randomize_torchsanity(FILE* fp)
 
 			if (valid)
 			{
-				unsigned char newByte = item_progression[i];
+				newByte = item_progression[i];
 				fseek(fp, torches[randVal], SEEK_SET);
 				fwrite(&newByte, sizeof(newByte), 1, fp);
 			}
@@ -12455,7 +20301,6 @@ void show_message(const char *message) {
     gtk_widget_destroy(dialog);
 }
 
-
 void test_UNUSED4D_function(FILE* fp)
 {
 	/*
@@ -13117,6 +20962,17 @@ int helper_QoL_item_limit_call(GtkWidget *widget, gpointer data, FILE* fp,  GtkW
 
 	return user_input;
 }
+
+void on_golden_knight_toggled(GtkToggleButton *toggle, gpointer user_data)
+{
+    CheckBoxData *cb_data = (CheckBoxData *)user_data;
+
+    gboolean active = gtk_toggle_button_get_active(toggle);
+
+    // Show or hide the entry box based on checkbox state
+    gtk_widget_set_visible(cb_data->golden_knight_entry, active);
+}
+
 static void on_submit(GtkWidget *widget, gpointer data) {
 	//g_print("Submitted \n");
     unsigned int xseed = 0;
@@ -13277,6 +21133,25 @@ static void on_submit(GtkWidget *widget, gpointer data) {
 				randomize_area_locking(fp);
 				player_chooses[22] = 'Y';
 			}
+			if (i == 47) {
+				const gchar *text = gtk_entry_get_text(GTK_ENTRY(cb_data->golden_knight_entry));
+				int chance = atoi(text);
+
+				// Validate
+				if (chance < 0 || chance > 100) {
+				GtkWidget *dialog = gtk_message_dialog_new(NULL,
+						GTK_DIALOG_MODAL,
+						GTK_MESSAGE_ERROR,
+						GTK_BUTTONS_OK,
+						"Golden Knight chance must be between 0 and 100.");
+					gtk_dialog_run(GTK_DIALOG(dialog));
+					gtk_widget_destroy(dialog);
+					return; // Stop submission
+				}
+
+				randomize_enemy_spawns(fp, chance);
+				player_chooses[23] = 'Y';
+			}
 		}
 	}
 	for(int i = 0; i < TOTAL_CHECKBOXES; i++){
@@ -13344,6 +21219,7 @@ static void on_submit(GtkWidget *widget, gpointer data) {
 		fprintf(fptr,"music rando: %c \n",(char)player_chooses[20]);
 		fprintf(fptr,"torch-sanity: %c \n",(char)player_chooses[21]);
 		fprintf(fptr,"area_locking: %c \n",(char)player_chooses[22]);
+		fprintf(fptr,"enemy spawn randomization: %c \n",(char)player_chooses[23]);
 		//printf("end of log part 1 \n");
 	}
 	
@@ -13621,6 +21497,8 @@ int main(int argc, char *argv[]) {
     // Create a grid for checkboxes  
     GtkWidget *grid = gtk_grid_new();  
     gtk_container_add(GTK_CONTAINER(scrolled_window), grid);  
+	
+	
 
     // Initialize CheckBoxData structure  
     CheckBoxData cb_data;  
@@ -13634,7 +21512,7 @@ int main(int argc, char *argv[]) {
         "Vertical High", "Rising Shot", "Fast Rising", "Spinning Blast", "Energy Blast",
         "Sonic Edge", "A Extension 1", "A Extension 2", "Step Attack", "Falcon Claw",
         "Quick Step", "Quick Step 2", "Perfect Guard", "check_seed", "fake/trap items", "pumpkin subweapons", "randomize \nSave Rooms", "orbs/whips \nanywhere","music rando",
-		"Torch-sanity","AreaLocking",
+		"Torch-sanity","AreaLocking","Enemy Randomization",
 		};
 	
 	const gchar *checkbox_tooltips[TOTAL_CHECKBOXES] = {
@@ -13647,7 +21525,8 @@ int main(int argc, char *argv[]) {
 		"Enable Sonic Edge", "Enable A Extension 1", "Enable A Extension 2", "Enable Step Attack", "Enable Falcon Claw",
 		"Enable Quick Step", "Enable Quick Step 2", "Enable Perfect Guard", "Check seed for completability",
 		"Enable fake/trap items\n Items named 'Sylph's Feather won't do\n what the model would imply", "pumpkin subweapons instead of normal for some", "Randomize Save Rooms", "removes the orb/whip from the boss \nand places them anywhere", "randomizes some 'mostly' boss music",
-		"Lets 'most' torches in the game have item drops in them\nTHIS IS STILL IN DEVELOPMENT","Uses the colored keys to lock the areas\nThis likely breaks the standard functionality\nThe keys are set to be in 'random' torches"
+		"Lets 'most' torches in the game have item drops in them\n","Uses the colored keys to lock the areas\nThis likely breaks the standard functionality\nThe keys are set to be in 'random' torches",
+		"Changes enemy spawns in the game\nThis does not have logic to make sure all enemies still exist yet...\n",
 	};
 	
 	// Create checkboxes and apply the 'checkbox-label' class from CSS
@@ -13685,7 +21564,31 @@ int main(int argc, char *argv[]) {
     //gtk_button_set_label(GTK_BUTTON(cb_data.checkboxes[23]), "start with skills");
     g_signal_connect(cb_data.checkboxes[23], "toggled", G_CALLBACK(on_show_more_toggled), &cb_data);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(cb_data.checkboxes[23]), TRUE); // Start checked
+	/*
+		I would like to add a box for the user to type under checkbox 48 if it is checked
+		it should have the tool-tip "%chance Golden Knight becomes a boss"
+		we should limit that to between 0 and 100 for the input on submitting it. it will be sent to the on_submit to be used for:
+			if(i == 47){
+				randomize_enemy_spawns(fp,chance);
+				player_chooses[23] = 'Y';
+			}
+	*/
+	
+	// Create the Golden Knight chance entry (hidden by default)
+	cb_data.golden_knight_entry = gtk_entry_new();
+	gtk_entry_set_text(GTK_ENTRY(cb_data.golden_knight_entry), "85"); 
+	gtk_widget_set_tooltip_text(
+		cb_data.golden_knight_entry,
+		"% chance Golden Knight becomes a boss"
+	);
 
+
+	gtk_widget_set_visible(cb_data.golden_knight_entry, FALSE);
+
+	// Attach it under checkbox #48 (index 47)
+	int row = 47 / COLS + 1;
+	gtk_grid_attach(GTK_GRID(grid), cb_data.golden_knight_entry, 47 % COLS, row, 1, 1);
+	g_signal_connect(cb_data.checkboxes[47], "toggled", G_CALLBACK(on_golden_knight_toggled), &cb_data);
 
 	cb_data.random_seed_button = gtk_button_new_with_label("Random seed");  
     gtk_box_pack_start(GTK_BOX(vbox), cb_data.random_seed_button, FALSE, FALSE, 5);  
