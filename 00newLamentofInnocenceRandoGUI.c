@@ -11,6 +11,7 @@
 #include <pango/pango.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <glib.h>
 
 #define ROWS 6
 #define COLS 8
@@ -21423,6 +21424,11 @@ static void on_browse_spoiler_clicked(GtkButton *button, gpointer user_data) {
 }
 
 int main(int argc, char *argv[]) {  
+	// Tell GTK where to find schemas and themes
+    g_setenv("GSETTINGS_SCHEMA_DIR", "share/glib-2.0/schemas", TRUE);
+    g_setenv("GTK_DATA_PREFIX", ".", TRUE);
+    g_setenv("XDG_DATA_DIRS", "share", TRUE);
+	
 	gtk_init(&argc, &argv);
 	srand(time(NULL));
 
