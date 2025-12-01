@@ -20963,6 +20963,20 @@ int helper_QoL_item_limit_call(GtkWidget *widget, gpointer data, FILE* fp,  GtkW
 
 	return user_input;
 }
+// Callback for mutually exclusive checkboxes
+static void on_checkbox42_46_toggled(GtkToggleButton *button, gpointer user_data) {
+    GtkWidget **checkboxes = (GtkWidget **)user_data;
+
+    if (button == GTK_TOGGLE_BUTTON(checkboxes[42])) {
+        if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkboxes[42]))) {
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkboxes[46]), FALSE);
+        }
+    } else if (button == GTK_TOGGLE_BUTTON(checkboxes[46])) {
+        if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkboxes[46]))) {
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(checkboxes[42]), FALSE);
+        }
+    }
+}
 
 void on_golden_knight_toggled(GtkToggleButton *toggle, gpointer user_data)
 {
@@ -21571,13 +21585,8 @@ int main(int argc, char *argv[]) {
     g_signal_connect(cb_data.checkboxes[23], "toggled", G_CALLBACK(on_show_more_toggled), &cb_data);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(cb_data.checkboxes[23]), TRUE); // Start checked
 	/*
-		I would like to add a box for the user to type under checkbox 48 if it is checked
-		it should have the tool-tip "%chance Golden Knight becomes a boss"
-		we should limit that to between 0 and 100 for the input on submitting it. it will be sent to the on_submit to be used for:
-			if(i == 47){
-				randomize_enemy_spawns(fp,chance);
-				player_chooses[23] = 'Y';
-			}
+		I need to add a restriction where if checkbox 42 is checked 46 will uncheck
+		&& if 46 gets checked then 42 gets unchecked.
 	*/
 	
 	// Create the Golden Knight chance entry (hidden by default)
@@ -21595,6 +21604,9 @@ int main(int argc, char *argv[]) {
 	int row = 47 / COLS + 1;
 	gtk_grid_attach(GTK_GRID(grid), cb_data.golden_knight_entry, 47 % COLS, row, 1, 1);
 	g_signal_connect(cb_data.checkboxes[47], "toggled", G_CALLBACK(on_golden_knight_toggled), &cb_data);
+	
+	g_signal_connect(cb_data.checkboxes[42], "toggled", G_CALLBACK(on_checkbox42_46_toggled), cb_data.checkboxes);
+	g_signal_connect(cb_data.checkboxes[46], "toggled", G_CALLBACK(on_checkbox42_46_toggled), cb_data.checkboxes);	
 
 	cb_data.random_seed_button = gtk_button_new_with_label("Random seed");  
     gtk_box_pack_start(GTK_BOX(vbox), cb_data.random_seed_button, FALSE, FALSE, 5);  
