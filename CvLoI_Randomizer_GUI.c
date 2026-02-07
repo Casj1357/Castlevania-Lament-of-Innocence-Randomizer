@@ -253,7 +253,7 @@ static void load_preset(UIWidgets *ui) {
 
     /* Item shuffle */
     LOAD_BOOL(chk_item_shuffle);
-    LOAD_INT(cmb_item_shuffle_mode);
+    //LOAD_INT(cmb_item_shuffle_mode);
 
     /* Main options */
     LOAD_BOOL(chk_orbs_anywhere);
