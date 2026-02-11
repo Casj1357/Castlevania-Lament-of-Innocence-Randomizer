@@ -19,6 +19,7 @@ gcc CvLoI_Randomizer_GUI.c CvLoIRandomizerV5.c -o CvLoI_Randomizer_GUI \
 #include <pango/pango.h>
 #include <glib.h>
 #include "CvLoIRandomizer.h"
+#include <windows.h>
 
 #define PRESET_FILE "preset.json"
 
@@ -26,6 +27,25 @@ gcc CvLoI_Randomizer_GUI.c CvLoIRandomizerV5.c -o CvLoI_Randomizer_GUI \
 static void update_mode(GtkComboBoxText *combo, gpointer user_data);
 static void on_enemy_random_toggled(GtkToggleButton *toggle, gpointer user_data);
 //void run_randomizer(RandomizerSettings *s);
+
+static void set_portable_env(void) {
+    char exe_path[MAX_PATH];
+    GetModuleFileNameA(NULL, exe_path, MAX_PATH);
+
+    char *slash = strrchr(exe_path, '\\');
+    if (slash) *slash = '\0';
+
+    g_setenv("GTK_USE_PORTAL", "0", TRUE);
+
+    char schema_dir[MAX_PATH];
+    snprintf(schema_dir, MAX_PATH, "%s\\share\\glib-2.0\\schemas", exe_path);
+    g_setenv("GSETTINGS_SCHEMA_DIR", schema_dir, TRUE);
+
+    char pixbuf_dir[MAX_PATH];
+    snprintf(pixbuf_dir, MAX_PATH, "%s\\lib", exe_path);
+    g_setenv("GDK_PIXBUF_MODULEDIR", pixbuf_dir, TRUE);
+}
+
 
 /* Widgets we'll need to show/hide/enable/disable */
 typedef struct {
@@ -976,7 +996,11 @@ static void on_submit(GtkButton *btn, gpointer data)
 
 int main(int argc, char *argv[]) {
 	g_setenv("GTK_USE_PORTAL", "0", TRUE);
-	g_setenv("GSETTINGS_BACKEND", "memory", TRUE);
+	//g_setenv("GSETTINGS_BACKEND", "memory", TRUE);
+	
+	g_setenv("GSETTINGS_SCHEMA_DIR", "share/glib-2.0/schemas", TRUE);
+	
+	set_portable_env();
 	
     gtk_init(&argc, &argv);
 
