@@ -12467,7 +12467,7 @@ sizeof(enemy_room_283)/sizeof(enemy_room_283[0]),
 
 	int forbidden_writes[] = {
 		0x7F,0x7E,0x7D,0x7C,0x7B,0x7A,0x79,0x78,0x77,0x76,0x75,0x74,0x73,0x72,
-		0x6E,0x68,0x64,0x63,0x60,
+		0x6E,0x68,0x64,0x63,0x60,0x62,0x69, //added fleamen and death ripper to excluded enemies (hopefully to avoid softlocks)
 		0x5F,0x5E,0x5D,0x5C,0x5B,0x5A,0x59,0x56,0x55,0x54,0x52,0x51,0x50,
 		0x4F,0x4D,0x4B,0x4A,0x49,0x48,0x46,0x45,0x44,0x43,0x42,0x41,0x40,
 		0x3F,0x3E,0x3D,0x3C,0x3B,0x37,0x33,0x32,0x31,
@@ -14359,7 +14359,7 @@ void create_Log(FILE* fp, FILE* fptr, int hashed_seed,const char text_seed[])
 	{
 		if( i < locations_Length - 130)
 		{
-			fprintf(fptr,locations_Names[i]);
+			fprintf(fptr,"%s",locations_Names[i]);
 			//printf(locations_Names[i]);
 			fprintf(fptr," = ");
 			//printf(" = ");
@@ -14367,7 +14367,7 @@ void create_Log(FILE* fp, FILE* fptr, int hashed_seed,const char text_seed[])
 			n = fread(buffer,sizeof(buffer),1,fp);
 			for(int t = 0; t < SIZE; t++)
 			{
-				fprintf(fptr,itemNames[buffer[t]]);
+				fprintf(fptr,"%s",itemNames[buffer[t]]);
 				//printf(itemNames[buffer[t]]);
 			}
 			fprintf(fptr," \n" );
@@ -14376,7 +14376,7 @@ void create_Log(FILE* fp, FILE* fptr, int hashed_seed,const char text_seed[])
 	}
 	for(int i = 0; i <= 65; i++)
 	{
-		fprintf(fptr,enemies[i].name);
+		fprintf(fptr,"%s",enemies[i].name);
 		//printf(enemies[i].name);
 		fprintf(fptr,"\n common: ");
 		//printf("\n common: ");
@@ -14384,7 +14384,7 @@ void create_Log(FILE* fp, FILE* fptr, int hashed_seed,const char text_seed[])
 		n = fread(buffer,sizeof(buffer),1,fp);
 		for(int t = 0; t < SIZE; t++)
 		{
-			fprintf(fptr,itemNames[buffer[t]]);
+			fprintf(fptr,"%s",itemNames[buffer[t]]);
 			//printf(itemNames[buffer[t]]);
 		}
 		fprintf(fptr,"\n");
@@ -14395,7 +14395,7 @@ void create_Log(FILE* fp, FILE* fptr, int hashed_seed,const char text_seed[])
 		n = fread(buffer,sizeof(buffer),1,fp);
 		for(int t = 0; t < SIZE; t++)
 		{
-			fprintf(fptr,itemNames[buffer[t]]);
+			fprintf(fptr,"%s",itemNames[buffer[t]]);
 			//printf(itemNames[buffer[t]]);
 		}
 		fprintf(fptr," \n");
@@ -14412,7 +14412,7 @@ void create_Log(FILE* fp, FILE* fptr, int hashed_seed,const char text_seed[])
 				fread(buffer,sizeof(buffer),1,fp);
 				for(int t = 0; t < SIZE; t++)
 				{
-					fprintf(fptr,itemNames[buffer[t]]);
+					fprintf(fptr,"%s",itemNames[buffer[t]]);
 				}
 				fprintf(fptr,"\n");
 				break;
@@ -14422,7 +14422,7 @@ void create_Log(FILE* fp, FILE* fptr, int hashed_seed,const char text_seed[])
 				fread(buffer,sizeof(buffer),1,fp);
 				for(int t = 0; t < SIZE; t++)
 				{
-					fprintf(fptr,itemNames[buffer[t]]);
+					fprintf(fptr,"%s",itemNames[buffer[t]]);
 				}
 				fprintf(fptr,"\n");
 				break;
@@ -14432,7 +14432,7 @@ void create_Log(FILE* fp, FILE* fptr, int hashed_seed,const char text_seed[])
 				fread(buffer,sizeof(buffer),1,fp);
 				for(int t = 0; t < SIZE; t++)
 				{
-					fprintf(fptr,itemNames[buffer[t]]);
+					fprintf(fptr,"%s",itemNames[buffer[t]]);
 				}
 				fprintf(fptr,"\n");
 				break;
@@ -14442,7 +14442,7 @@ void create_Log(FILE* fp, FILE* fptr, int hashed_seed,const char text_seed[])
 				fread(buffer,sizeof(buffer),1,fp);
 				for(int t = 0; t < SIZE; t++)
 				{
-					fprintf(fptr,itemNames[buffer[t]]);
+					fprintf(fptr,"%s",itemNames[buffer[t]]);
 				}
 				fprintf(fptr,"\n");
 				break;
@@ -14452,7 +14452,7 @@ void create_Log(FILE* fp, FILE* fptr, int hashed_seed,const char text_seed[])
 				fread(buffer,sizeof(buffer),1,fp);
 				for(int t = 0; t < SIZE; t++)
 				{
-					fprintf(fptr,itemNames[buffer[t]]);
+					fprintf(fptr,"%s",itemNames[buffer[t]]);
 				}
 				fprintf(fptr,"\n");
 				break;
@@ -14462,7 +14462,7 @@ void create_Log(FILE* fp, FILE* fptr, int hashed_seed,const char text_seed[])
 				fread(buffer,sizeof(buffer),1,fp);
 				for(int t = 0; t < SIZE; t++)
 				{
-					fprintf(fptr,itemNames[buffer[t]]);
+					fprintf(fptr,"%s",itemNames[buffer[t]]);
 				}
 				fprintf(fptr,"\n");
 				break;
@@ -14472,7 +14472,7 @@ void create_Log(FILE* fp, FILE* fptr, int hashed_seed,const char text_seed[])
 				fread(buffer,sizeof(buffer),1,fp);
 				for(int t = 0; t < SIZE; t++)
 				{
-					fprintf(fptr,itemNames[buffer[t]]);
+					fprintf(fptr,"%s",itemNames[buffer[t]]);
 				}
 				fprintf(fptr,"\n");
 				break;
@@ -14482,7 +14482,7 @@ void create_Log(FILE* fp, FILE* fptr, int hashed_seed,const char text_seed[])
 				fread(buffer,sizeof(buffer),1,fp);
 				for(int t = 0; t < SIZE; t++)
 				{
-					fprintf(fptr,itemNames[buffer[t]]);
+					fprintf(fptr,"%s",itemNames[buffer[t]]);
 				}
 				fprintf(fptr,"\n");
 				break;
@@ -14492,7 +14492,7 @@ void create_Log(FILE* fp, FILE* fptr, int hashed_seed,const char text_seed[])
 				fread(buffer,sizeof(buffer),1,fp);
 				for(int t = 0; t < SIZE; t++)
 				{
-					fprintf(fptr,itemNames[buffer[t]]);
+					fprintf(fptr,"%s",itemNames[buffer[t]]);
 				}
 				fprintf(fptr,"\n");
 				break;
