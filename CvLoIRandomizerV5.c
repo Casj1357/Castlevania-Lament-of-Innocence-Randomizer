@@ -2308,6 +2308,7 @@ void setup_destroy_shop(FILE* fp)
             fwrite(&zero, sizeof(zero), 1, fp);
         }
 
+		/*
         // Write 4 bytes for sell cost only for specific items
         if(i < 38 || i > 64)
         {
@@ -2317,6 +2318,7 @@ void setup_destroy_shop(FILE* fp)
                 fwrite(&zero, sizeof(zero), 1, fp);
             }
         }
+		*/
     }
 }
 
@@ -2367,13 +2369,15 @@ void setup_change_sprites(FILE* fp)
 }
 
 
-static void write_string(FILE* fp, const char* s)
+static void write_string(FILE* fp, const char* s, bool terminator)
 {
     for (int i = 0; s[i] != '\0'; i++)
         fwrite(&s[i], 1, 1, fp);
 
-    unsigned char end = 0x00;
-    fwrite(&end, 1, 1, fp);
+	if(terminator) {
+		unsigned char end = 0x00;
+		fwrite(&end, 1, 1, fp);
+	}
 }
 typedef struct {
     int room;
@@ -4257,13 +4261,13 @@ void hints_bosses(FILE* fp, const char* bossName, int roomNumber)
             fseek(fp, hint_table[i].desc_addr, SEEK_SET);
 
             // Write the boss name
-            write_string(fp, bossName);
+            write_string(fp, bossName, false);
 
             // Write '@'
             fwrite(&separator, 1, 1, fp);
 
             // Write the location name
-            write_string(fp, hint_table[i].location_name);
+            write_string(fp, hint_table[i].location_name, true);
 
             return; // done
         }
